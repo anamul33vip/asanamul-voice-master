@@ -1,0 +1,6 @@
+db.json
+uploads/
+node_modules/
+local.properties
+*.keystore
+*.jks

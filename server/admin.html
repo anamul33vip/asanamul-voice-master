@@ -1,0 +1,47 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AS ANAMUL VOICE Admin</title>
+<style>
+:root{--bg:#05050c;--tx:#fff}
+@property --a{syntax:'<angle>';initial-value:0deg;inherits:false}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,sans-serif;padding:14px;max-width:900px;margin:auto}
+h1{text-align:center;background:linear-gradient(90deg,#0ff,#f0f,#ff0,#0f0,#0ff);background-size:300%;-webkit-background-clip:text;color:transparent;animation:m 4s linear infinite}
+@keyframes m{to{background-position:300%}}@keyframes r{to{--a:360deg}}
+.card{position:relative;border-radius:16px;padding:14px;margin:12px 0;background:#0b0b18;border:2px solid transparent;
+background:linear-gradient(#0b0b18,#0b0b18) padding-box,conic-gradient(from var(--a),#f0f,#0ff,#0f0,#ff0,#f00,#f0f) border-box;animation:r 4s linear infinite}
+input,select,button,textarea{background:#12122a;color:#fff;border:1px solid #333;border-radius:10px;padding:10px;margin:3px 0;font-size:14px;width:100%;box-sizing:border-box}
+button{background:linear-gradient(90deg,#f0f,#0ff);border:0;font-weight:700;cursor:pointer;color:#000}
+.s{width:auto;padding:6px 10px;margin:2px;font-size:12px}.row{display:flex;gap:6px}.row>*{flex:1}
+table{width:100%;font-size:12px;border-collapse:collapse}td,th{padding:6px;border-bottom:1px solid #222;text-align:left;word-break:break-all}
+.x{overflow-x:auto}
+</style></head><body>
+<h1>⚡ AS ANAMUL VOICE — ADMIN</h1>
+<div id="login" class="card"><input id="pw" type="password" placeholder="Admin Password"><button onclick="login()">LOGIN</button></div>
+<div id="app" style="display:none">
+<div class="card"><h3>🎙️ TTS / Voice API</h3><div id="ttsInfo">Checking provider…</div><small>API Key নিরাপত্তার জন্য Server Environment Variable-এ রাখতে হবে; এখানে বা Android APK-তে নয়।</small></div>
+<div class="card"><h3>🔑 Key তৈরি</h3><div class="row"><input id="kn" placeholder="নাম (ইউজার)"><input id="kk" placeholder="কাস্টম Key (খালি = অটো)"></div>
+<div class="row"><input id="kd" type="number" placeholder="দিন (0 = আনলিমিটেড)" value="30"><input id="kc" type="number" placeholder="Credits" value="0"></div><button onclick="addKey()">➕ Key বানাও</button></div>
+<div class="card x"><h3>👥 Keys</h3><table id="kt"></table></div>
+<div class="card"><h3>🎟 Coupon (মেয়াদ বাড়ানোর)</h3><div class="row"><input id="cd" type="number" placeholder="দিন" value="7"><input id="cc" type="number" placeholder="Credits" value="0"></div><button onclick="addCp()">➕ Coupon বানাও</button><div id="ct"></div></div>
+<div class="card"><h3>🎤 ভয়েস যোগ করো</h3><input id="vt" placeholder="ভয়েসের নাম"><label>অডিও (mp3/wav/m4a/ogg)</label><input id="va" type="file" accept="audio/*"><label>ছবি</label><input id="vi" type="file" accept="image/*">
+<label><input id="vp" type="checkbox" style="width:auto"> 💎 Premium (শুধু পেইড ইউজার)</label><button onclick="addVoice()">⬆ আপলোড</button><div id="vl"></div></div>
+<div class="card"><h3>⚙ App Config</h3><input id="c_notice" placeholder="নোটিশ"><input id="c_telegram" placeholder="Telegram link"><input id="c_youtube" placeholder="YouTube link"><input id="c_buy_link" placeholder="Buy/Premium link"><input id="c_version" type="number" placeholder="Latest version code"><input id="c_update_url" placeholder="Update URL"><label><input id="c_update_required" type="checkbox" style="width:auto"> Update বাধ্যতামূলক</label>
+<h4>🎙 TTS / ElevenLabs</h4><label>Default Voice ID (optional)</label><input id="c_tts_voice_id" placeholder="Default Voice ID"><label>TTS Model</label><select id="c_tts_model_id"><option value="eleven_v3">eleven_v3</option><option value="eleven_multilingual_v2">eleven_multilingual_v2</option><option value="eleven_flash_v2_5">eleven_flash_v2_5</option></select><small>API Key এখানে লিখবেন না। Server-এর environment variable-এ ELEVENLABS_API_KEY সেট করুন। ইউজার অ্যাপে নিজের Voice ID দিতে পারবে।</small>
+<button onclick="saveCfg()">💾 Save</button></div></div>
+<script>
+let T='';const $=i=>document.getElementById(i);
+const api=(p,b)=>fetch(p,{method:b?'POST':'GET',headers:{Authorization:'Bearer '+T,'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(r=>r.json());
+async function login(){const r=await fetch('/admin/login',{method:'POST',body:JSON.stringify({pass:$('pw').value})}).then(r=>r.json());if(!r.ok)return alert('ভুল পাসওয়ার্ড');T=r.token;$('login').style.display='none';$('app').style.display='block';load()}
+const fd=t=>t?new Date(t*1000).toLocaleDateString():'∞';
+async function load(){const d=await api('/admin/data');
+$('kt').innerHTML='<tr><th>Key</th><th>নাম</th><th>মেয়াদ</th><th>Cr</th><th>ডিভাইস</th><th></th></tr>'+d.keys.map(k=>`<tr><td>${k.key}</td><td>${k.name}</td><td>${fd(k.expires)}</td><td>${k.credits}</td><td>${k.device?'🔒':'-'}</td><td>
+<button class=s onclick="ke('${k.key}',{addDays:30})">+30d</button><button class=s onclick="ke('${k.key}',{addCredits:10})">+10cr</button><button class=s onclick="ke('${k.key}',{resetDevice:1})">↺dev</button><button class=s onclick="ke('${k.key}',{banned:${!k.banned}})">${k.banned?'Unban':'Ban'}</button><button class=s onclick="kd('${k.key}')">🗑</button></td></tr>`).join('');
+$('ct').innerHTML=d.coupons.map(c=>`<div>${c.code} — ${c.days}d/${c.credits}cr ${c.used?'✅used':''}</div>`).join('');
+$('vl').innerHTML=d.voices.map(v=>`<div>${v.premium?'💎':'🆓'} ${v.title} <button class=s onclick="vd('${v.id}')">🗑</button></div>`).join('');
+$('ttsInfo').innerHTML=d.tts.configured?'🟢 ElevenLabs API configured · Model: '+d.tts.model+' · Max chars: '+d.tts.max_chars:'🔴 API Key not configured · Set ELEVENLABS_API_KEY on the server';
+for(const k in d.config){const e=$('c_'+k);if(e){e.type=='checkbox'?e.checked=d.config[k]:e.value=d.config[k]}}}
+const ke=async(k,o)=>{await api('/admin/key/edit',{key:k,...o});load()},kd=async k=>{if(confirm('Delete?')){await api('/admin/key/del',{key:k});load()}},vd=async id=>{await api('/admin/voice/del',{id});load()};
+async function addKey(){await api('/admin/key/add',{name:$('kn').value,key:$('kk').value,days:$('kd').value,credits:$('kc').value});load()}
+async function addCp(){await api('/admin/coupon/add',{days:$('cd').value,credits:$('cc').value});load()}
+const b64=f=>new Promise(r=>{if(!f)return r('');const x=new FileReader;x.onload=()=>r(x.result.split(',')[1]);x.readAsDataURL(f)});
+async function addVoice(){const a=$('va').files[0],i=$('vi').files[0];await api('/admin/voice/add',{title:$('vt').value,premium:$('vp').checked,audioB64:await b64(a),audioExt:a?a.name.split('.').pop():'',imageB64:await b64(i),imageExt:i?i.name.split('.').pop():''});$('vt').value='';load()}
+async function saveCfg(){const o={};['notice','telegram','youtube','buy_link','update_url','tts_voice_id','tts_model_id'].forEach(k=>o[k]=$('c_'+k).value);o.version=+$('c_version').value;o.update_required=$('c_update_required').checked;await api('/admin/config',o);alert('Saved ✅')}
+</script></body></html>

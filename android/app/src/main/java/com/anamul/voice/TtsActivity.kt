@@ -83,7 +83,7 @@ class TtsActivity : Activity() {
 
         generate = neonButton("✨ Generate Voice") { generateVoice() }
         root.addView(generate, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) })
-        root.addView(neonButton("▶ Play Generated Audio") { lastAudio?.let { Player.play(it) } ?: toast("আগে Voice Generate করুন") },
+        root.addView(neonButton("▶ Play Generated Audio") { lastAudio?.let { playRouted(it) } ?: toast("আগে Voice Generate করুন") },
             LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
         root.addView(neonButton("⬇ Save MP3 to phone") { saveAudio() },
             LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
@@ -152,7 +152,7 @@ class TtsActivity : Activity() {
                         lastAudio = f
                         generate.isEnabled = true
                         status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB"
-                        Player.play(f)
+                        playRouted(f)
                     }
                 } catch (e: Exception) {
                     runOnUiThread { generate.isEnabled = true; status.text = "❌ অডিও ডাউনলোড হয়নি: ${e.message}" }

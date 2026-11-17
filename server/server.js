@@ -28,7 +28,7 @@ http.createServer(async(q,r)=>{
  const u=new URL(q.url,'http://x'),p=u.pathname;
  if(q.method==='OPTIONS')return send(r,200,{});
  try{
- if(p==='/'||p==='/admin')return send(r,200,fs.readFileSync(path.join(__dirname,'admin.html')),'text/html; charset=utf-8');
+ if(p==='/'||p==='/admin')return send(r,200,fs.readFileSync(path.join(__dirname,'admin.html'),'utf8'),'text/html; charset=utf-8');
  if(p.startsWith('/files/')){const f=path.join(UP,path.basename(p));if(!fs.existsSync(f))return send(r,404,{});r.writeHead(200);return fs.createReadStream(f).pipe(r)}
  // ---------- APP API ----------
  if(p==='/api/app/login'&&q.method==='POST'){

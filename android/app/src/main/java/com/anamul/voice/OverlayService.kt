@@ -35,11 +35,11 @@ class OverlayService : Service() {
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(8), dp(8), dp(8), dp(8)) }
         val ok = Api.expires == 0L || Api.expires > System.currentTimeMillis() / 1000
         Api.voices.forEach { v -> col.addView(neonButton((if (v.optBoolean("premium")) "💎 " else "") + v.optString("title")) { play(v, ok) }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(4) }) }
-        col.addView(neonButton("⏹ Stop") { Player.stop() }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(4) })
+        col.addView(neonButton("⏹ Stop") { stopRouted() }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(4) })
         col.addView(neonButton("✖ Close") { stopSelf() }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(4) })
         val sv = ScrollView(this).apply { addView(col) }
         val f = RgbFrame(this, sv); wm.addView(f, lp(dp(220), dp(320)).apply { x = 90; y = 300; flags = flags and WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE.inv() or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE }); panel = f }
     private fun play(v: JSONObject, ok: Boolean) { if (v.optBoolean("premium") && !ok) return
-        Thread { try { Player.play(Api.download(this, v.getString("audio"), "a_" + v.optString("id") + "." + v.getString("audio").substringAfterLast('.'))) } catch (_: Exception) {} }.start() }
-    override fun onDestroy() { Player.stop(); bubble?.let { wm.removeView(it) }; panel?.let { wm.removeView(it) }; super.onDestroy() }
+        Thread { try { playRouted(Api.download(this, v.getString("audio"), "a_" + v.optString("id") + "." + v.getString("audio").substringAfterLast('.'))) } catch (_: Exception) {} }.start() }
+    override fun onDestroy() { stopRouted(); bubble?.let { wm.removeView(it) }; panel?.let { wm.removeView(it) }; super.onDestroy() }
 }

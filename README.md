@@ -1,4 +1,4 @@
-# AS ANAMUL VOICE — Master (v2.0.0)
+# AS ANAMUL VOICE — Master (v2.1.0)
 
 Original Kotlin Android app (`com.anamul.voice`) + zero-dependency Node.js
 API/admin backend. The reference APK in the original MASTER zip is NOT
@@ -6,9 +6,12 @@ included here and is never copied or re-signed.
 
 ## App (`android/`)
 
-- Key login (device-locked), voice list, speaker playback, floating overlay,
-  coupon redeem, TTS screen (ElevenLabs via backend).
-- No mic/Shizuku injection in this source — playback is speaker-only.
+- Key login (device-locked), voice list, floating overlay, coupon redeem,
+  TTS screen (ElevenLabs via backend).
+- Mic Mode (v2.1.0): Shizuku injector — `Injector` + `MicInjector` (own code,
+  AudioPolicy LOOP_BACK|RENDER) routes sounds into the microphone; when Mic
+  Mode is off, playback is speaker-only. Needs the Shizuku app running +
+  one Allow tap in Shizuku; mic result must be ear-tested in-game.
 - Build with GitHub Actions: **Actions → Build APK → Run workflow**, enter the
   live backend URL as `server_url`. The APK is unsigned; it is signed with
   the owner's keystore before delivery.

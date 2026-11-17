@@ -45,6 +45,21 @@ object Player { private var mp: MediaPlayer? = null
     fun play(f: File) { stop(); mp = MediaPlayer().apply { setDataSource(f.path); prepare(); start() } }
     fun stop() { try { mp?.release() } catch (_: Exception) {}; mp = null } }
 
+/** সাউন্ড বাজানো: Mic Mode চালু থাকলে মাইক্রোফোনে (injector), নইলে স্পিকারে। */
+fun Context.playRouted(f: File) {
+    if (MicInjector.isMicActive()) {
+        val p = MicInjector.resolveMicPath(this, f)
+        if (p != null && MicInjector.sendInjectorCommand(this, "play:$p")) return
+    }
+    Player.play(f)
+}
+
+/** সব থামানো: স্পিকার + মাইকের সাউন্ড। */
+fun Context.stopRouted() {
+    Player.stop()
+    try { if (MicInjector.isMicActive()) MicInjector.sendInjectorCommand(this, "stop") } catch (_: Exception) {}
+}
+
 // ====== RGB Neon UI helpers ======
 val RGB = intArrayOf(0xFFFF00FF.toInt(), 0xFF00FFFF.toInt(), 0xFF00FF66.toInt(), 0xFFFFFF00.toInt(), 0xFFFF2222.toInt(), 0xFFFF00FF.toInt())
 fun Context.dp(v: Int) = (v * resources.displayMetrics.density).toInt()

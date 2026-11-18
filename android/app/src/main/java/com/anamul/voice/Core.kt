@@ -18,6 +18,17 @@ const val SERVER = BuildConfig.SERVER_URL
 object Api {
     var token = ""; var cfg: JSONObject? = null; var voices = listOf<JSONObject>()
     var expires = 0L; var credits = 0; var ttsEnabled = false
+    // ---- APK Update (Admin Panel -> Version + APK URL + Release Note) ----
+    var updateAvailable = false; var latestVersion = ""; var apkUrl = ""; var releaseNote = ""; var updateRequired = false
+    // ---- Voice Profiles (Admin Panel -> Display Name / Provider / Voice ID / Language / Status) ----
+    var voiceProfiles = listOf<JSONObject>(); var activeVoiceProfile: JSONObject? = null
+    fun cmpVer(a: String, b: String): Int { val pa = a.split('.').map { it.toIntOrNull() ?: 0 }; val pb = b.split('.').map { it.toIntOrNull() ?: 0 }
+        for (i in 0 until maxOf(pa.size, pb.size)) { val d = (pa.getOrNull(i) ?: 0) - (pb.getOrNull(i) ?: 0); if (d != 0) return d }; return 0 }
+    fun applyUpdate(u: JSONObject?) { if (u == null) return
+        latestVersion = u.optString("latest_version"); apkUrl = u.optString("apk_url"); releaseNote = u.optString("release_note"); updateRequired = u.optBoolean("required")
+        updateAvailable = latestVersion.isNotEmpty() && cmpVer(latestVersion, BuildConfig.VERSION_NAME) > 0 && apkUrl.isNotEmpty() }
+    /** Public update check — no login needed: GET /api/update?v=currentVersion */
+    fun checkUpdate(): Boolean { val r = call("/api/update?v=" + BuildConfig.VERSION_NAME); if (!r.optBoolean("ok")) return false; applyUpdate(r); return updateAvailable }
     fun call(path: String, body: JSONObject? = null, readTimeoutMs: Int = 15000): JSONObject = try {
         val c = URL(SERVER + path).openConnection() as HttpURLConnection
         c.connectTimeout = 15000; c.readTimeout = readTimeoutMs; c.setRequestProperty("Accept", "application/json")
@@ -28,6 +39,9 @@ object Api {
     } catch (e: Exception) { JSONObject().put("ok", false).put("error", "net:" + e.message) }
     fun loadConfig(): Boolean { val r = call("/api/app/config"); if (!r.optBoolean("ok")) return false
         cfg = r.getJSONObject("config")
+        applyUpdate(r.optJSONObject("update"))
+        val vp = r.optJSONArray("voice_profiles"); voiceProfiles = if (vp != null) (0 until vp.length()).map { vp.getJSONObject(it) } else emptyList()
+        activeVoiceProfile = r.optJSONObject("active_voice_profile") ?: voiceProfiles.firstOrNull { it.optBoolean("active") }
         // Merge server-side environment defaults without exposing the provider API key.
         r.optJSONObject("tts")?.let { tts ->
             if (cfg?.optString("tts_voice_id").isNullOrBlank()) cfg?.put("tts_voice_id", tts.optString("default_voice_id"))

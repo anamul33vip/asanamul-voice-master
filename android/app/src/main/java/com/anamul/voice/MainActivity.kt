@@ -18,9 +18,8 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 /**
- * v2.4.0 — স্টাইলিশ নতুন ডিজাইন (নিজের AS ANAMUL লুক):
- * ওপরে লোগো + Key স্ট্যাটাস কার্ড, বড় Injector টগল, টেস্ট সাউন্ড,
- * ছোট এক লাইনের বোতাম (আর কাটে না)।
+ * v2.6.0 — Admin থেকে APK Update (Version + APK URL + Release Note) + Voice Profiles:
+ * নতুন Version এলে Update ডায়ালগ, হাতে চেক করার বোতাম।
  */
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout; private lateinit var info: TextView
@@ -76,6 +75,8 @@ class MainActivity : Activity() {
         root.addView(neonButton("🎙 TTS Voice") {
             startActivity(Intent(this, TtsActivity::class.java))
         }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
+        // ---- App Update: Admin থেকে নতুন Version এলে এখানে দেখাবে ----
+        root.addView(neonButton("📲 App Update চেক করুন") { checkUpdateManually() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
         // ---- টেস্ট সাউন্ড: ভয়েস ছাড়াই স্পিকার/মাইক পথ যাচাই ----
         root.addView(neonButton("🔊 টেস্ট সাউন্ড বাজান") { testSound() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
         // ---- ভলিউম ----
@@ -127,8 +128,39 @@ class MainActivity : Activity() {
     override fun onResume() { super.onResume(); refreshMic(); localVoices = Voices.load(this); render(); refreshCrashLine(); refreshQuiet() }
     override fun onDestroy() { try { Shizuku.removeRequestPermissionResultListener(permListener) } catch (_: Exception) {}; super.onDestroy() }
 
-    /** Admin থেকে ক্রেডিট/মেয়াদ বদলালে অ্যাপ খুললেই নতুন মান দেখাবে (কোনো টোস্ট ছাড়া)। */
-    private fun refreshQuiet() = Thread { if (Api.loadConfig()) runOnUiThread { render() } }.start()
+    /** Admin থেকে ক্রেডিট/মেয়াদ বদলালে অ্যাপ খুললেই নতুন মান দেখাবে (কোনো টোস্ট ছাড়া)। নতুন Version থাকলে Update ডায়ালগ দেখাবে। */
+    private fun refreshQuiet() = Thread { if (Api.loadConfig()) runOnUiThread { render(); maybeShowUpdate() } }.start()
+
+    private var updateShown = false
+    /** Admin Panel-এ নতুন Version + APK URL + Release Note থাকলে একবারই Update ডায়ালগ দেখায়। */
+    private fun maybeShowUpdate() {
+        if (updateShown || !Api.updateAvailable) return
+        updateShown = true
+        showUpdateDialog()
+    }
+
+    private fun showUpdateDialog() {
+        val msg = StringBuilder("নতুন ভার্সন v${Api.latestVersion} এসেছে!\n")
+        if (Api.releaseNote.isNotEmpty()) msg.append("\nনতুন পরিবর্তন:\n${Api.releaseNote}\n")
+        msg.append("\nএখন আপডেট করবেন?")
+        val b = AlertDialog.Builder(this).setTitle("📲 Update available").setMessage(msg.toString())
+            .setPositiveButton("⬇ Update করুন") { _, _ -> open(Api.apkUrl) }
+        if (!Api.updateRequired) b.setNegativeButton("পরে", null)
+        b.setCancelable(!Api.updateRequired).show()
+    }
+
+    /** হাতে চেক: সার্ভারে নতুন Version আছে কি না। */
+    private fun checkUpdateManually() {
+        toast("⏳ Update চেক হচ্ছে…")
+        Thread {
+            val has = try { Api.checkUpdate() } catch (_: Exception) { false }
+            runOnUiThread {
+                if (has) { updateShown = true; showUpdateDialog() }
+                else if (Api.latestVersion.isNotEmpty()) toast("✅ সর্বশেষ ভার্সন ব্যবহার করছেন (v${Api.latestVersion})")
+                else toast("❌ Update চেক হয়নি — ইন্টারনেট দেখুন")
+            }
+        }.start()
+    }
 
     private fun refreshCrashLine() {
         val last = readCrashLogLast()

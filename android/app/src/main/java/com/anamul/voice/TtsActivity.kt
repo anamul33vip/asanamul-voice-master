@@ -23,6 +23,8 @@ class TtsActivity : Activity() {
     private lateinit var voiceId: EditText
     private lateinit var voiceName: EditText
     private lateinit var savedVoiceSpinner: Spinner
+    private lateinit var profileSpinner: Spinner
+    private lateinit var profileInfo: TextView
     private val savedVoiceIds = mutableListOf<JSONObject>()
     private lateinit var textInput: EditText
     private lateinit var model: Spinner
@@ -47,6 +49,24 @@ class TtsActivity : Activity() {
             gravity = Gravity.CENTER
             setTextColor(0xFFB8B8D8.toInt())
         })
+
+        // ---- Voice Profile (Admin Panel থেকে: Display Name / Provider / Voice ID / Language / Status) ----
+        root.addView(neonText("🎙 Voice Profile", 14f), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(18) })
+        profileSpinner = Spinner(this)
+        root.addView(profileSpinner, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(6) })
+        profileInfo = neonText("", 12f, false).apply { setTextColor(0xFF9FFFFF.toInt()) }
+        root.addView(profileInfo, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        refreshProfileSpinner()
+        profileSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+            override fun onItemSelected(parent: AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                val p = Api.voiceProfiles.getOrNull(position) ?: return
+                if (::voiceId.isInitialized) voiceId.setText(p.optString("voice_id"))
+                val on = p.optString("status", "ON") == "ON"
+                profileInfo.text = "Display Name: ${p.optString("name")} • Provider: ${p.optString("provider", "ElevenLabs")} • Language: ${if (p.optString("language", "bn") == "bn") "Bengali" else p.optString("language")} • Status: ${if (on) "🟢 ON" else "🔴 OFF"}"
+                if (!on) toast("⚠ এই প্রোফাইল OFF — Admin থেকে ON করুন")
+            }
+        }
 
         root.addView(neonText("ElevenLabs Voice ID", 14f), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(18) })
         voiceId = neonInput("আপনার Voice ID লিখুন")
@@ -124,6 +144,25 @@ class TtsActivity : Activity() {
         setContentView(FrameLayout(this).apply { addView(Glow(this@TtsActivity)); addView(ScrollView(this@TtsActivity).apply { addView(root) }) })
     }
 
+    /** Admin-এর Voice Profiles দেখায়; Active প্রোফাইল আগে থেকে বেছে নেওয়া থাকে। */
+    private fun refreshProfileSpinner() {
+        val labels = Api.voiceProfiles.map {
+            "${it.optString("name")} • ${it.optString("provider", "ElevenLabs")} • ${it.optString("language", "bn")} • ${if (it.optString("status", "ON") == "ON") "ON" else "OFF"}${if (it.optBoolean("active")) " ⭐" else ""}"
+        }
+        val adapter = ArrayAdapter(this, android.R.layout.simple_spinner_item, if (labels.isEmpty()) listOf("কোনো Voice Profile নেই — Admin থেকে যোগ করুন") else labels)
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        profileSpinner.adapter = adapter
+        val activeIdx = Api.voiceProfiles.indexOfFirst { it.optBoolean("active") }.coerceAtLeast(0)
+        if (Api.voiceProfiles.isNotEmpty()) {
+            profileSpinner.setSelection(activeIdx)
+            val p = Api.voiceProfiles[activeIdx]
+            if (::voiceId.isInitialized) voiceId.setText(p.optString("voice_id"))
+            profileInfo.text = "Display Name: ${p.optString("name")} • Provider: ${p.optString("provider", "ElevenLabs")} • Language: ${if (p.optString("language", "bn") == "bn") "Bengali" else p.optString("language")} • Status: ${if (p.optString("status", "ON") == "ON") "🟢 ON" else "🔴 OFF"}"
+        } else {
+            profileInfo.text = "Admin Panel → Voice Profiles থেকে Voice A/B/C যোগ করুন"
+        }
+    }
+
     private fun loadSavedVoiceIds() {
         savedVoiceIds.clear()
         try {
@@ -197,7 +236,7 @@ class TtsActivity : Activity() {
                         generating = false
                         generate.isEnabled = true
                         Voices.addFile(this, f, "TTS: " + txt.take(30))
-                        status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB (My Voices-এ সেভ হয়েছে)"
+                        status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB\nText → Generate → Audio → Injector/Speaker-এ বাজছে (My Voices-এ সেভ হয়েছে)"
                         playRouted(f)
                     }
                 } catch (e: Exception) {
@@ -222,6 +261,7 @@ class TtsActivity : Activity() {
                         "provider_auth_failed" -> "❌ ElevenLabs API Key ভুল বা অনুমতি নেই।"
                         "provider_quota_or_plan" -> "❌ API credit/plan limit শেষ হয়েছে।"
                         "provider_paid_plan_required" -> "❌ এই ভয়েস Free প্ল্যানে API দিয়ে চলে না। নিচের ✅ Free ভয়েস বোতাম চাপুন।"
+                        "voice_profile_off" -> "❌ এই Voice Profile Admin-এ OFF আছে — Admin থেকে ON করুন।"
                         "provider_quota" -> "❌ ElevenLabs-এর মাসিক ক্রেডিট শেষ হয়েছে।"
                         "provider_rate_limited" -> "⏳ একসাথে অনেক অনুরোধ — ১ মিনিট পরে আবার চেষ্টা করুন।"
                         else -> "❌ Voice তৈরি হয়নি: $err ${detail.take(160)}"

@@ -17,7 +17,7 @@ const val SERVER = BuildConfig.SERVER_URL
 
 object Api {
     var token = ""; var cfg: JSONObject? = null; var voices = listOf<JSONObject>()
-    var expires = 0L; var credits = 0
+    var expires = 0L; var credits = 0; var ttsEnabled = false
     fun call(path: String, body: JSONObject? = null, readTimeoutMs: Int = 15000): JSONObject = try {
         val c = URL(SERVER + path).openConnection() as HttpURLConnection
         c.connectTimeout = 15000; c.readTimeout = readTimeoutMs; c.setRequestProperty("Accept", "application/json")
@@ -32,6 +32,7 @@ object Api {
         r.optJSONObject("tts")?.let { tts ->
             if (cfg?.optString("tts_voice_id").isNullOrBlank()) cfg?.put("tts_voice_id", tts.optString("default_voice_id"))
             if (cfg?.optString("tts_model_id").isNullOrBlank()) cfg?.put("tts_model_id", tts.optString("model_id", "eleven_v3"))
+            ttsEnabled = tts.optBoolean("enabled")
         }
         expires = r.optLong("expires_epoch"); credits = r.optInt("credits")
         val a = r.getJSONArray("voices"); voices = (0 until a.length()).map { a.getJSONObject(it) }; return true }
@@ -83,9 +84,29 @@ fun Context.neonText(t: String, size: Float = 16f, bold: Boolean = true) = TextV
     setShadowLayer(12f, 0f, 0f, 0xFF00FFFF.toInt()) }
 
 fun Context.neonButton(t: String, onClick: () -> Unit) = Button(this).apply {
-    text = t; setTextColor(Color.BLACK); setTypeface(null, Typeface.BOLD); isAllCaps = false
+    text = t; textSize = 13.5f; setSingleLine(true); ellipsize = android.text.TextUtils.TruncateAt.END
+    setTextColor(Color.BLACK); setTypeface(null, Typeface.BOLD); isAllCaps = false
     background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF00FF.toInt(), 0xFF00FFFF.toInt())).apply { cornerRadius = 60f }
     setOnClickListener { onClick() } }
+
+/** বিল্ট-ইন টেস্ট সাউন্ড (১ সেকেন্ডের বিপ) — স্পিকার/মাইক পথ যাচাইয়ের জন্য, সার্ভার লাগে না। */
+fun Context.testToneFile(): File {
+    val f = File(cacheDir, "test_tone.wav")
+    if (f.exists() && f.length() > 1000) return f
+    val sr = 22050; val n = sr
+    val data = ByteArray(44 + n * 2)
+    fun wstr(off: Int, s: String) { s.toByteArray(Charsets.US_ASCII).copyInto(data, off) }
+    fun w32(off: Int, v: Int) { data[off] = (v and 0xFF).toByte(); data[off + 1] = ((v shr 8) and 0xFF).toByte(); data[off + 2] = ((v shr 16) and 0xFF).toByte(); data[off + 3] = ((v shr 24) and 0xFF).toByte() }
+    fun w16(off: Int, v: Int) { data[off] = (v and 0xFF).toByte(); data[off + 1] = ((v shr 8) and 0xFF).toByte() }
+    wstr(0, "RIFF"); w32(4, 36 + n * 2); wstr(8, "WAVE"); wstr(12, "fmt "); w32(16, 16); w16(20, 1); w16(22, 1); w32(24, sr); w32(28, sr * 2); w16(32, 2); w16(34, 16); wstr(36, "data"); w32(40, n * 2)
+    for (i in 0 until n) {
+        val env = if (i < n / 10) i.toDouble() / (n / 10) else if (i > n * 9 / 10) (n - i).toDouble() / (n / 10) else 1.0
+        val s = (Math.sin(2.0 * Math.PI * 880.0 * i / sr) * env * 28000).toInt() and 0xFFFF
+        w16(44 + i * 2, s)
+    }
+    f.writeBytes(data)
+    return f
+}
 
 fun Context.neonInput(hint: String) = EditText(this).apply { this.hint = hint; setHintTextColor(0xFF777799.toInt()); setTextColor(Color.WHITE)
     setPadding(dp(16), dp(12), dp(16), dp(12))

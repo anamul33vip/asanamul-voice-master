@@ -14,11 +14,14 @@ import android.view.Gravity
 import android.widget.*
 import org.json.JSONObject
 import rikka.shizuku.Shizuku
-import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.util.*
 
+/**
+ * v2.4.0 — স্টাইলিশ নতুন ডিজাইন (নিজের AS ANAMUL লুক):
+ * ওপরে লোগো + Key স্ট্যাটাস কার্ড, বড় Injector টগল, টেস্ট সাউন্ড,
+ * ছোট এক লাইনের বোতাম (আর কাটে না)।
+ */
 class MainActivity : Activity() {
     private lateinit var list: LinearLayout; private lateinit var info: TextView
     private lateinit var micStatus: TextView; private lateinit var micBtn: Button
@@ -31,33 +34,48 @@ class MainActivity : Activity() {
     private val permListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
         if (requestCode != MicInjector.REQ_SHIZUKU_PERMISSION) return@OnRequestPermissionResultListener
         refreshMic()
-        if (grantResult == PackageManager.PERMISSION_GRANTED) toast("✅ Shizuku অনুমতি দেওয়া হয়েছে — Mic Mode চালু করুন")
+        if (grantResult == PackageManager.PERMISSION_GRANTED) toast("✅ Shizuku অনুমতি দেওয়া হয়েছে — Injector চালু করুন")
         else toast("❌ Shizuku অনুমতি দেওয়া হয়নি — Shizuku খুলে Allow দিন")
     }
 
     override fun onCreate(s: Bundle?) { super.onCreate(s)
         try { Shizuku.addRequestPermissionResultListener(permListener) } catch (_: Exception) {}
         localVoices = Voices.load(this)
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(30), dp(14), dp(10)) }
-        root.addView(neonText("⚡ AS ANAMUL VOICE", 22f).apply { gravity = Gravity.CENTER })
-        info = neonText("", 12f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFF9FFFFF.toInt()) }; root.addView(info)
-        val notice = neonText(Api.cfg?.optString("notice") ?: "", 13f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFFFFFF66.toInt()) }; root.addView(notice)
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(28), dp(14), dp(10)) }
+
+        // ---- ওপরের স্ট্যাটাস কার্ড: লোগো + Key মেয়াদ ----
+        val headRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        headRow.addView(ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_CROP }, LinearLayout.LayoutParams(dp(56), dp(56)))
+        val headCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        headCol.addView(neonText("⚡ AS ANAMUL VOICE", 20f))
+        info = neonText("", 12f, false).apply { setTextColor(0xFF9FFFFF.toInt()) }
+        headCol.addView(info)
+        headRow.addView(headCol, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(10) })
+        root.addView(RgbFrame(this, headRow), LinearLayout.LayoutParams(-1, -2))
+        val notice = neonText(Api.cfg?.optString("notice") ?: "", 13f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFFFFFF66.toInt()) }
+        root.addView(notice, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+
+        // ---- Injector কার্ড: বড় ON/OFF টগল ----
+        val injRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), dp(6), dp(6), dp(6)) }
+        injRow.addView(neonText("⚡ Injector", 16f), LinearLayout.LayoutParams(0, -2, 1f))
+        micBtn = neonButton("Injector: OFF") { toggleMic() }
+        injRow.addView(micBtn, LinearLayout.LayoutParams(dp(150), dp(46)))
+        val injCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        injCol.addView(injRow)
+        micStatus = neonText("Mic Mode: বন্ধ — স্পিকারে বাজছে", 12f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFF9FFFFF.toInt()) }
+        injCol.addView(micStatus, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        root.addView(RgbFrame(this, injCol), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+
         val bar = LinearLayout(this)
         bar.addView(neonButton("🔄 Refresh") { refresh() }, LinearLayout.LayoutParams(0, dp(46), 1f))
         bar.addView(neonButton("🎈 Overlay") { startOverlay() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
         bar.addView(neonButton("⏹ Stop") { stopRouted() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
         root.addView(bar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        root.addView(neonButton("🎙 TTS Voice Generation — Text to Speech") {
+        root.addView(neonButton("🎙 TTS Voice") {
             startActivity(Intent(this, TtsActivity::class.java))
         }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
-        // ---- Mic Mode (Shizuku injector) ----
-        micStatus = neonText("🎙 Mic Mode: বন্ধ — স্পিকারে বাজছে", 13f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFF9FFFFF.toInt()) }
-        root.addView(micStatus, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
-        val micBar = LinearLayout(this)
-        micBtn = neonButton("🎙 Mic Mode চালু") { toggleMic() }
-        micBar.addView(micBtn, LinearLayout.LayoutParams(0, dp(46), 1f))
-        micBar.addView(neonButton("🛡 Shizuku চেক") { checkShizuku() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
-        root.addView(micBar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+        // ---- টেস্ট সাউন্ড: ভয়েস ছাড়াই স্পিকার/মাইক পথ যাচাই ----
+        root.addView(neonButton("🔊 টেস্ট সাউন্ড বাজান") { testSound() }, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
         // ---- ভলিউম ----
         val volRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
         volRow.addView(neonText("🔊", 16f))
@@ -72,7 +90,7 @@ class MainActivity : Activity() {
         volRow.addView(volBar, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(6) })
         volRow.addView(neonButton("Max") { setMusicVolume(Int.MAX_VALUE); volBar.progress = musicVolumeMax(); toast("🔊 ভলিউম সর্বোচ্চ") }, LinearLayout.LayoutParams(dp(64), dp(40)))
         root.addView(volRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        // ---- ভয়েস যোগ + ব্যাকআপ + Shizuku অপশন (দুই লাইনে — লেখা কাটে না) ----
+        // ---- ভয়েস যোগ + ব্যাকআপ + Shizuku অপশন ----
         val addBar = LinearLayout(this)
         addBar.addView(neonButton("➕ ভয়েস যোগ") { pickVoices() }, LinearLayout.LayoutParams(0, dp(46), 1f))
         addBar.addView(neonButton("📦 ব্যাকআপ") { backupMenu() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
@@ -115,22 +133,36 @@ class MainActivity : Activity() {
     private fun refreshMic() {
         if (!::micStatus.isInitialized) return
         micStatus.text = when {
-            MicInjector.isMicActive() -> "🎙 Mic Mode: চালু — সাউন্ড মাইক্রোফোনে যাবে"
-            !MicInjector.apiLevelOk() -> "🎙 Mic Mode: Android 6.0+ লাগবে"
-            !MicInjector.isShizukuInstalled(this) -> "🎙 Mic Mode: Shizuku অ্যাপ ইনস্টল নেই"
-            !MicInjector.isShizukuRunning() -> "🎙 Mic Mode: Shizuku চলছে না — Shizuku খুলে Start করুন"
-            !MicInjector.hasPermission() -> "🎙 Mic Mode: Shizuku অনুমতি লাগবে — Shizuku চেক চাপুন"
-            else -> "🎙 Mic Mode: বন্ধ — স্পিকারে বাজছে"
+            MicInjector.isMicActive() -> "✅ Injector চালু — সাউন্ড মাইক্রোফোনে যাবে"
+            !MicInjector.apiLevelOk() -> "Android 6.0+ লাগবে"
+            !MicInjector.isShizukuInstalled(this) -> "Shizuku অ্যাপ ইনস্টল নেই"
+            !MicInjector.isShizukuRunning() -> "Shizuku চলছে না — Shizuku খুলে Start করুন"
+            !MicInjector.hasPermission() -> "Shizuku অনুমতি লাগবে — Shizuku অপশন চাপুন"
+            else -> "Mic Mode: বন্ধ — স্পিকারে বাজছে"
         }
-        if (::micBtn.isInitialized) micBtn.text = if (MicInjector.isMicActive()) "⏹ Mic Mode বন্ধ" else "🎙 Mic Mode চালু"
+        if (::micBtn.isInitialized) micBtn.text = if (MicInjector.isMicActive()) "✅ Injector: ON" else "⚡ Injector: OFF"
     }
 
     private fun toggleMic() {
-        if (MicInjector.isMicActive()) { MicInjector.stopInjector(this); refreshMic(); toast("Mic Mode বন্ধ — স্পিকারে বাজবে"); return }
+        if (MicInjector.isMicActive()) { MicInjector.stopInjector(this); refreshMic(); toast("Injector বন্ধ — স্পিকারে বাজবে"); return }
         micStatus.text = "⏳ Injector চালু হচ্ছে…"
         MicInjector.startInjector(this, object : MicInjector.StartCallback {
             override fun done(ok: Boolean, messageBn: String, messageEn: String) { toast(messageBn); refreshMic() }
         })
+    }
+
+    /** বিল্ট-ইন টেস্ট সাউন্ড — ভয়েস ছাড়াই স্পিকার/মাইক পথ যাচাই করা যায়। */
+    private fun testSound() {
+        Thread {
+            try {
+                val f = testToneFile()
+                val toMic = MicInjector.isMicActive()
+                runOnUiThread {
+                    playRouted(f)
+                    toast(if (toMic) "🔊 টেস্ট সাউন্ড মাইকে যাচ্ছে — গেমে শুনুন" else "🔊 টেস্ট সাউন্ড স্পিকারে বাজছে")
+                }
+            } catch (_: Exception) { runOnUiThread { toast("❌ টেস্ট সাউন্ড হয়নি") } }
+        }.start()
     }
 
     private fun checkShizuku() {
@@ -138,7 +170,7 @@ class MainActivity : Activity() {
             !MicInjector.isShizukuInstalled(this) -> { toast("Shizuku অ্যাপ ইনস্টল নেই — খুলছি"); MicInjector.openShizukuApp(this) }
             !MicInjector.isShizukuRunning() -> toast("Shizuku চলছে না — Shizuku খুলে Start করুন, তারপর আবার চাপুন")
             !MicInjector.hasPermission() -> { MicInjector.requestPermission(); toast("Shizuku অনুমতি চাওয়া হয়েছে — Allow দিন") }
-            else -> toast("✅ Shizuku ঠিক আছে — Mic Mode চালু করুন")
+            else -> toast("✅ Shizuku ঠিক আছে — Injector চালু করুন")
         }
         refreshMic()
     }
@@ -149,12 +181,12 @@ class MainActivity : Activity() {
         sb.append("Shizuku ইনস্টল: ${if (MicInjector.isShizukuInstalled(this)) "✅ হ্যাঁ" else "❌ না"}\n")
         sb.append("Shizuku চলছে: ${if (MicInjector.isShizukuRunning()) "✅ হ্যাঁ" else "❌ না — Shizuku খুলে Start করুন"}\n")
         sb.append("অনুমতি: ${if (MicInjector.hasPermission()) "✅ দেওয়া আছে" else "❌ দেওয়া হয়নি — Always allow দিন"}\n")
-        sb.append("Mic Mode: ${if (MicInjector.isMicActive()) "✅ চালু" else "বন্ধ"}\n")
+        sb.append("Injector: ${if (MicInjector.isMicActive()) "✅ চালু" else "বন্ধ"}\n")
         try {
             val last = MicInjector.getInjectorLogLastLine(this)
             if (!last.isNullOrBlank()) sb.append("Injector লগ: $last\n")
         } catch (_: Exception) {}
-        sb.append("\nসেটআপ গাইড:\n1. Shizuku অ্যাপ খুলে Start চাপুন\n2. এই অ্যাপে 🛡 Shizuku চেক চাপুন\n3. Allow / Always allow দিন\n4. 🎙 Mic Mode চালু করুন চাপুন\n5. গেমে গিয়ে ভয়েস বাজান — অন্য প্লেয়ার শুনবে")
+        sb.append("\nসেটআপ গাইড:\n1. Shizuku অ্যাপ খুলে Start চাপুন\n2. এই অ্যাপে 🛡 Shizuku অপশন থেকে অনুমতি চান\n3. Allow / Always allow দিন\n4. ⚡ Injector চালু করুন চাপুন\n5. গেমে গিয়ে ভয়েস বাজান — অন্য প্লেয়ার শুনবে")
         val tv = TextView(this).apply { text = sb.toString(); setTextColor(0xFFFFFFFF.toInt()); textSize = 14f; setPadding(dp(8), dp(8), dp(8), dp(8)) }
         AlertDialog.Builder(this)
             .setTitle("🛡 Shizuku / Root অপশন")
@@ -210,7 +242,7 @@ class MainActivity : Activity() {
                     var added = 0
                     uris.forEach { u -> try { if (Voices.addUri(this, u) != null) added++ } catch (_: Exception) {} }
                     localVoices = Voices.load(this)
-                    runOnUiThread { render(); toast(if (added > 0) "✅ ${added}টি ভয়েস যোগ হয়েছে" else "❌ কোনো ভয়েস যোগ হয়নি") }
+                    runOnUiThread { render(); toast(if (added > 0) "✅ ${added}টি ভয়েস যোগ হয়েছে" else "❌ কোনো ভয়েস যোগ হয়নি — অডিও/ভিডিও ফাইল দিন") }
                 }.start()
             }
             EXPORT_BACKUP -> {
@@ -258,7 +290,7 @@ class MainActivity : Activity() {
         list.addView(neonText("🎵 আমার ভয়েস (${shown.size}) — চাপলে বাজবে, চেপে ধরলে Rename/Delete", 14f).apply { setTextColor(0xFF9FFFFF.toInt()) },
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         shown.forEach { v -> list.addView(localCard(v), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
-        if (Api.voices.isEmpty() && localVoices.isEmpty()) list.addView(neonText("কোনো ভয়েস নেই। ➕ ভয়েস যোগ করুন চাপুন।", 14f))
+        if (Api.voices.isEmpty() && localVoices.isEmpty()) list.addView(neonText("কোনো ভয়েস নেই। ➕ ভয়েস যোগ চাপুন, বা 🔊 টেস্ট সাউন্ড বাজান।", 14f))
     }
 
     private fun card(v: JSONObject, ok: Boolean): FrameLayout {
@@ -274,7 +306,8 @@ class MainActivity : Activity() {
     private fun localCard(v: Voices.V): FrameLayout {
         val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10), dp(10), dp(10), dp(10)) }
         row.addView(neonText("🎵", 22f), LinearLayout.LayoutParams(dp(40), dp(40)))
-        row.addView(neonText(v.title + if (v.source == "video") "  (ভিডিও থেকে)" else "", 16f), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
+        val tag = when (v.source) { "video" -> " 🎬" ; "tts" -> " ✨" ; else -> "" }
+        row.addView(neonText(v.title + tag, 16f), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
         val frame = RgbFrame(this, row)
         frame.setOnClickListener { playLocal(v) }
         frame.setOnLongClickListener { localMenu(v); true }

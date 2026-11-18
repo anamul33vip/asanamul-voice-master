@@ -77,7 +77,8 @@ object Voices {
         return ext in listOf("mp4", "mkv", "mov", "webm", "3gp", "avi", "flv")
     }
 
-    /** একটা ফাইল যোগ করা — অডিও হলে কপি, ভিডিও হলে অডিও ট্র্যাক বের করে .m4a বানানো হয়। */
+    /** একটা ফাইল যোগ করা — অডিও হলে কপি, ভিডিও হলে অডিও ট্র্যাক বের করে .m4a বানানো হয়।
+     *  ভিডিও থেকে অডিও বের করা না গেলে আসল ভিডিও ফাইলটাই রাখা হয় (MediaPlayer ভিডিওর অডিও বাজাতে পারে)। */
     fun addUri(c: Context, uri: Uri): V? {
         val name = displayName(c, uri)
         val base = name.substringBeforeLast('.').ifEmpty { "Voice" }
@@ -85,13 +86,34 @@ object Voices {
         return try {
             if (isVideo(c, uri)) {
                 val out = File(dir(c), "$id.m4a")
-                if (extractAudio(c, uri, out)) V(id, base, out.name, "video") else null
+                val ok = runCatching { extractAudio(c, uri, out) }.getOrDefault(false) && out.exists() && out.length() > 0
+                if (ok) return V(id, base, out.name, "video")
+                out.delete()
+                val ext2 = name.substringAfterLast('.', "mp4").lowercase().ifEmpty { "mp4" }
+                val out2 = File(dir(c), "$id.$ext2")
+                c.contentResolver.openInputStream(uri)?.use { inp -> out2.outputStream().use { inp.copyTo(it) } }
+                if (out2.exists() && out2.length() > 0) V(id, base, out2.name, "video") else null
             } else {
                 val ext = name.substringAfterLast('.', "mp3").lowercase().ifEmpty { "mp3" }
                 val out = File(dir(c), "$id.$ext")
                 c.contentResolver.openInputStream(uri)?.use { inp -> out.outputStream().use { inp.copyTo(it) } }
                 if (out.exists() && out.length() > 0) V(id, base, out.name, "audio") else null
             }
+        } catch (_: Exception) { null }
+    }
+
+    /** তৈরি করা ফাইল (যেমন TTS-এর MP3) লাইব্রেরিতে যোগ করা — ভয়েস চ্যাটের পর ভয়েস লিস্টে দেখা যায়। */
+    fun addFile(c: Context, src: File, title: String, source: String = "tts"): V? {
+        return try {
+            val list = load(c)
+            val id = System.currentTimeMillis().toString()
+            val ext = src.extension.ifEmpty { "mp3" }
+            val out = File(dir(c), "$id.$ext")
+            src.copyTo(out, overwrite = true)
+            val v = V(id, title, out.name, source)
+            list.add(0, v)
+            save(c, list)
+            v
         } catch (_: Exception) { null }
     }
 

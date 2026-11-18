@@ -8,14 +8,17 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.*
 import android.widget.*
 import org.json.JSONObject
 
 /**
  * গেমের ওপরে ভাসমান বাবল + প্যানেল।
- * প্যানেলে আছে: Inject ON/OFF, সাউন্ড কার্ড, টাইপ ও পাঠান (TTS), ভলিউম, Stop all।
- * v2.2.0: ক্র্যাশ-সেফ — যেকোনো ভুল Toast + লগে লিখে সার্ভিস বাঁচিয়ে রাখে।
+ * v2.4.0: বাবলে অ্যাপের লোগো (মাইক ইমোজি নয়), প্যানেলে বড় Injector টগল,
+ * টাইপ ট্যাবে অটো-জেনারেট + অটো-সেন্ড — লিখলেই ভয়েস হয়ে মাইকে যায়।
+ * ক্র্যাশ-সেফ — যেকোনো ভুল Toast + লগে লিখে সার্ভিস বাঁচিয়ে রাখে।
  */
 class OverlayService : Service() {
     private var wm: WindowManager? = null
@@ -30,7 +33,12 @@ class OverlayService : Service() {
     private var typeTabBtn: Button? = null
     private var typeInput: EditText? = null
     private var sendBtn: Button? = null
+    private var autoBtn: Button? = null
+    private var typeStatus: TextView? = null
     private var volBar: SeekBar? = null
+    private var autoOn = true
+    private var autoBusy = false
+    private var autoTask: Runnable? = null
 
     override fun onBind(i: Intent?): IBinder? = null
 
@@ -63,7 +71,8 @@ class OverlayService : Service() {
     private fun showBubble() {
         try {
             wm = getSystemService(WINDOW_SERVICE) as WindowManager
-            val b = RgbFrame(this, TextView(this).apply { text = "🎤"; textSize = 22f; gravity = Gravity.CENTER }, 90f)
+            val img = ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_CROP }
+            val b = RgbFrame(this, img, 90f)
             val p = lp(dp(60), dp(60), WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS)
                 .apply { x = 20; y = 300 }
             var sx = 0f; var sy = 0f; var ox = 0; var oy = 0; var moved = false
@@ -111,16 +120,20 @@ class OverlayService : Service() {
     private fun buildPanel() {
         val w = wm ?: return
         val col = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(10), dp(10), dp(10), dp(10)) }
-        col.addView(neonText("🎤 AS ANAMUL VOICE", 16f).apply { gravity = Gravity.CENTER })
+        // হেডার: লোগো + নাম
+        val head = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+        head.addView(ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_CROP }, LinearLayout.LayoutParams(dp(40), dp(40)))
+        head.addView(neonText("AS ANAMUL VOICE", 16f), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
+        col.addView(head)
 
-        // Inject ON/OFF
+        // বড় Injector টগল
         injectBtn = neonButton(injectLabel()) { toggleInject() }
-        col.addView(injectBtn, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(8) })
+        col.addView(injectBtn, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
 
         // Tabs
         val tabs = LinearLayout(this)
-        soundTabBtn = neonButton("🎵 সাউন্ড কার্ড") { showTab(true) }
-        typeTabBtn = neonButton("⌨ টাইপ ও পাঠান") { showTab(false) }
+        soundTabBtn = neonButton("🎵 সাউন্ড") { showTab(true) }
+        typeTabBtn = neonButton("⌨ টাইপ") { showTab(false) }
         tabs.addView(soundTabBtn, LinearLayout.LayoutParams(0, dp(42), 1f))
         tabs.addView(typeTabBtn, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginStart = dp(6) })
         col.addView(tabs, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -130,7 +143,7 @@ class OverlayService : Service() {
         val ok = Api.expires == 0L || Api.expires > System.currentTimeMillis() / 1000
         val local = Voices.load(this)
         if (local.isEmpty() && Api.voices.isEmpty()) {
-            soundBox!!.addView(neonText("কোনো ভয়েস নেই — অ্যাপে গিয়ে ➕ ভয়েস যোগ করুন", 12f, false))
+            soundBox!!.addView(neonText("কোনো ভয়েস নেই — অ্যাপে গিয়ে ➕ ভয়েস যোগ করুন, বা 🔊 টেস্ট সাউন্ড বাজান", 12f, false))
         }
         local.forEach { v ->
             soundBox!!.addView(neonButton("▶ " + v.title) { playLocal(v) },
@@ -141,16 +154,40 @@ class OverlayService : Service() {
                 LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(4) })
         }
         val soundScroll = ScrollView(this).apply { addView(soundBox) }
-        col.addView(soundScroll, LinearLayout.LayoutParams(-1, dp(220)).apply { topMargin = dp(6) })
+        col.addView(soundScroll, LinearLayout.LayoutParams(-1, dp(200)).apply { topMargin = dp(6) })
 
         // Type & send tab (hidden first)
         typeBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
         val lastVid = getSharedPreferences("tts_preferences", MODE_PRIVATE).getString("last_voice_id", "") ?: ""
-        typeBox!!.addView(neonText(if (lastVid.isEmpty()) "Voice ID সেট করা নেই — অ্যাপের TTS স্ক্রিনে Voice ID সেভ করুন" else "Voice: $lastVid", 12f, false))
+        typeBox!!.addView(neonText(
+            if (!Api.ttsEnabled) "⚠ TTS বন্ধ — সার্ভারে ElevenLabs Key নেই"
+            else if (lastVid.isEmpty()) "Voice ID সেট করা নেই — অ্যাপের TTS স্ক্রিনে Voice ID সেভ করুন"
+            else "Voice: $lastVid", 12f, false))
         typeInput = neonInput("এখানে লিখুন…").apply { minLines = 3; maxLines = 5 }
         typeBox!!.addView(typeInput, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        sendBtn = neonButton("➤ Send (মাইকে যাবে)") { sendTyped() }
+        // অটো-সেন্ড: লেখা থামার ২ সেকেন্ড পর নিজে নিজে জেনারেট করে মাইকে পাঠায়।
+        autoBtn = neonButton(if (autoOn) "⚡ অটো: ON" else "⚡ অটো: OFF") {
+            autoOn = !autoOn
+            autoBtn?.text = if (autoOn) "⚡ অটো: ON" else "⚡ অটো: OFF"
+            toast(if (autoOn) "অটো-সেন্ড চালু — লিখলেই ভয়েস যাবে" else "অটো-সেন্ড বন্ধ")
+        }
+        typeBox!!.addView(autoBtn, LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(6) })
+        typeStatus = neonText("", 12f, false).apply { setTextColor(0xFF9FFFFF.toInt()) }
+        typeBox!!.addView(typeStatus, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+        sendBtn = neonButton("➤ Send") { sendTyped() }
         typeBox!!.addView(sendBtn, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6) })
+        typeInput!!.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                autoTask?.let { main.removeCallbacks(it) }
+                if (!autoOn || autoBusy) return
+                val t = s?.toString()?.trim() ?: ""
+                if (t.isEmpty()) return
+                autoTask = Runnable { if (autoOn && !autoBusy && typeInput?.text?.toString()?.trim() == t) sendTyped() }
+                main.postDelayed(autoTask!!, 2000)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
         col.addView(typeBox, LinearLayout.LayoutParams(-1, -2))
 
         // Volume
@@ -174,8 +211,8 @@ class OverlayService : Service() {
 
         // Bottom row
         val bottom = LinearLayout(this)
-        bottom.addView(neonButton("⏹ Stop all") { stopRouted() }, LinearLayout.LayoutParams(0, dp(44), 1f))
-        bottom.addView(neonButton("✖ বন্ধ করুন") { removePanel() }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(6) })
+        bottom.addView(neonButton("⏹ Stop") { stopRouted() }, LinearLayout.LayoutParams(0, dp(44), 1f))
+        bottom.addView(neonButton("✖ বন্ধ") { removePanel() }, LinearLayout.LayoutParams(0, dp(44), 1f).apply { marginStart = dp(6) })
         col.addView(bottom, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
 
         val f = RgbFrame(this, ScrollView(this).apply { addView(col) })
@@ -192,7 +229,7 @@ class OverlayService : Service() {
     }
 
     private fun injectLabel() =
-        if (MicInjector.isMicActive()) "✅ Inject ON (Shizuku) — চাপলে বন্ধ হবে" else "▶ Inject OFF — চাপলে Mic Mode চালু হবে"
+        if (MicInjector.isMicActive()) "✅ Injector: ON" else "⚡ Injector: OFF"
 
     private fun refreshInjectBtn() {
         main.post { try { injectBtn?.text = injectLabel() } catch (_: Exception) {} }
@@ -201,7 +238,7 @@ class OverlayService : Service() {
     private fun toggleInject() {
         if (MicInjector.isMicActive()) {
             MicInjector.stopInjector(this)
-            toast("Mic Mode বন্ধ — স্পিকারে বাজবে")
+            toast("Injector বন্ধ — স্পিকারে বাজবে")
             refreshInjectBtn()
             return
         }
@@ -231,13 +268,20 @@ class OverlayService : Service() {
         }.start()
     }
 
+    private fun setTypeStatus(t: String) {
+        main.post { try { typeStatus?.text = t } catch (_: Exception) {} }
+    }
+
     private fun sendTyped() {
         val txt = typeInput?.text?.toString()?.trim() ?: ""
         if (txt.isEmpty()) { toast("লেখা লিখুন"); return }
         val vid = getSharedPreferences("tts_preferences", MODE_PRIVATE).getString("last_voice_id", "") ?: ""
-        if (vid.isEmpty()) { toast("Voice ID সেট করা নেই — অ্যাপের TTS স্ক্রিনে সেভ করুন"); return }
+        if (vid.isEmpty()) { setTypeStatus("❌ Voice ID সেট করা নেই — অ্যাপের TTS স্ক্রিনে সেভ করুন"); return }
+        if (!Api.ttsEnabled) { setTypeStatus("❌ TTS বন্ধ — সার্ভারে ElevenLabs Key সেট করা নেই"); return }
+        if (autoBusy) return
+        autoBusy = true
         sendBtn?.isEnabled = false
-        toast("⏳ Voice তৈরি হচ্ছে…")
+        setTypeStatus("⏳ Voice তৈরি হচ্ছে…")
         Thread {
             try {
                 val req = JSONObject()
@@ -248,22 +292,24 @@ class OverlayService : Service() {
                 val r = Api.call("/api/app/tts", req, 120000)
                 if (r.optBoolean("ok")) {
                     val f = Api.download(this, r.getString("audio_url"), "tts_" + r.optString("id", System.currentTimeMillis().toString()) + ".mp3")
-                    main.post { sendBtn?.isEnabled = true; playRouted(f) }
+                    Voices.addFile(this, f, "TTS: " + txt.take(30))
+                    main.post { sendBtn?.isEnabled = true; autoBusy = false; setTypeStatus("✅ পাঠানো হয়েছে — My Voices-এ সেভ হয়েছে"); playRouted(f) }
                 } else {
                     val err = r.optString("error", "unknown")
                     main.post {
-                        sendBtn?.isEnabled = true
-                        toast(if (err == "tts_not_configured") "❌ সার্ভারে ElevenLabs Key সেট করা নেই" else "❌ Voice হয়নি: $err")
+                        sendBtn?.isEnabled = true; autoBusy = false
+                        setTypeStatus(if (err == "tts_not_configured") "❌ সার্ভারে ElevenLabs Key সেট করা নেই" else "❌ Voice হয়নি: $err")
                     }
                 }
             } catch (e: Exception) {
                 logCrash("overlay-tts", e)
-                main.post { sendBtn?.isEnabled = true; toast("❌ Voice হয়নি") }
+                main.post { sendBtn?.isEnabled = true; autoBusy = false; setTypeStatus("❌ Voice হয়নি") }
             }
         }.start()
     }
 
     override fun onDestroy() {
+        try { autoTask?.let { main.removeCallbacks(it) } } catch (_: Exception) {}
         try { stopRouted() } catch (_: Exception) {}
         try { panel?.let { wm?.removeView(it) } } catch (_: Exception) {}
         try { bubble?.let { wm?.removeView(it) } } catch (_: Exception) {}

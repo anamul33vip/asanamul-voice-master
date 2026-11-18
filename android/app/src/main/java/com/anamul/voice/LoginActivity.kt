@@ -1,5 +1,7 @@
 package com.anamul.voice
 import android.app.Activity
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
@@ -16,14 +18,26 @@ class LoginActivity : Activity() {
         col.addView(neonText("AS ANAMUL VOICE", 24f))
         col.addView(neonText("লগইন করে শুরু করুন", 14f, false).apply { setTextColor(0xFFAAAAFF.toInt()) })
         val key = neonInput("Access Key").apply { setText(sp.getString("key", "")) }
+        val keyRow = LinearLayout(this)
+        keyRow.addView(key, LinearLayout.LayoutParams(0, -2, 1f))
+        keyRow.addView(neonButton("📋 Paste") { pasteKey(key) }, LinearLayout.LayoutParams(dp(96), dp(48)).apply { marginStart = dp(6) })
+        col.addView(keyRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(20) })
         val st = neonText("", 13f, false)
-        col.addView(key, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(20) })
         col.addView(neonButton("🔑 লগইন") { go(key.text.toString(), st, sp) }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) })
-        col.addView(neonButton("🔑 GET FREE KEY — ৬ ধাপে ফ্রি Key") { openUrl(SERVER.trimEnd('/') + "/getkey") }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(10) })
+        col.addView(neonButton("🔑 GET FREE KEY") { openUrl(SERVER.trimEnd('/') + "/getkey") }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(10) })
         col.addView(neonButton("🛒 Key কিনুন (Premium)") { openUrl("https://t.me/crackffpanel") }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(10) })
         col.addView(st)
         setContentView(FrameLayout(this).apply { addView(Glow(this@LoginActivity)); addView(col) })
         if (key.text.isNotEmpty()) go(key.text.toString(), st, sp)
+    }
+    private fun pasteKey(key: EditText) {
+        try {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val t = cm.primaryClip?.getItemAt(0)?.text?.toString()?.trim() ?: ""
+            if (t.isEmpty()) { Toast.makeText(this, "ক্লিপবোর্ড খালি — আগে Key কপি করুন", Toast.LENGTH_SHORT).show(); return }
+            key.setText(t)
+            Toast.makeText(this, "✅ Key বসানো হয়েছে — লগইন চাপুন", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) { Toast.makeText(this, "Paste হয়নি", Toast.LENGTH_SHORT).show() }
     }
     private fun go(k: String, st: TextView, sp: android.content.SharedPreferences) {
         st.text = "⏳ লগইন হচ্ছে..."

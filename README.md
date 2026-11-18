@@ -28,6 +28,14 @@ included here and is never copied or re-signed.
   Telegram Join) then a 12h key is minted and auto-copied (one active
   key per device, POST /api/web/mint). Admin panel: every key and coupon
   has a 📋 copy button, and a new key shows a copy box + auto-copy.
+- v2.4.0 — Stylish redesign (own AS ANAMUL look): logo + Key status
+  card, big Injector ON/OFF toggle, one-line buttons (no more clipped
+  labels), logo bubble instead of the mic emoji, login Key paste button.
+  Fixes: video add falls back to keeping the original file when audio
+  extraction fails; TTS results auto-save into My Voices; auto-generate
+  in TTS screen and auto-send in the overlay type tab (type, pause 2s,
+  voice generates and plays routed); built-in 🔊 test sound (no voice
+  or server needed) to check the speaker/mic path.
 - Build with GitHub Actions: **Actions → Build APK → Run workflow**, enter the
   live backend URL as `server_url`. The APK is unsigned; it is signed with
   the owner's keystore before delivery.

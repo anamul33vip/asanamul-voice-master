@@ -4,6 +4,10 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.inputmethod.InputMethodManager
 import android.content.Context
@@ -25,6 +29,11 @@ class TtsActivity : Activity() {
     private lateinit var status: TextView
     private lateinit var generate: Button
     private var lastAudio: File? = null
+    private var autoOn = true
+    private var lastAutoText = ""
+    private val autoHandler = Handler(Looper.getMainLooper())
+    private var autoTask: Runnable? = null
+    private lateinit var autoBtn: Button
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -75,11 +84,31 @@ class TtsActivity : Activity() {
             inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES
         }
         root.addView(textInput, LinearLayout.LayoutParams(-1, dp(150)))
+        // টাইপ থামার ২ সেকেন্ড পর অটো-জেনারেট হয় (Voice ID থাকলে) — লিখলেই ভয়েস বানিয়ে মাইকে/স্পিকারে বাজবে।
+        textInput.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {
+                autoTask?.let { autoHandler.removeCallbacks(it) }
+                if (!autoOn) return
+                val t = s?.toString()?.trim() ?: ""
+                if (t.isEmpty() || t == lastAutoText) return
+                autoTask = Runnable { if (autoOn && textInput.text.toString().trim() == t) generateVoice() }
+                autoHandler.postDelayed(autoTask!!, 2000)
+            }
+            override fun afterTextChanged(s: Editable?) {}
+        })
 
-        status = neonText("API Key সার্ভারে সেট করা থাকলে Generate কাজ করবে।", 12f, false).apply {
-            setTextColor(0xFF9FFFFF.toInt())
+        status = neonText(if (Api.ttsEnabled) "API Key সার্ভারে সেট করা থাকলে Generate কাজ করবে।" else "⚠ TTS বন্ধ — সার্ভারে ElevenLabs Key সেট করা নেই। Key দিলে চালু হবে।", 12f, false).apply {
+            setTextColor(if (Api.ttsEnabled) 0xFF9FFFFF.toInt() else 0xFFFF8888.toInt())
         }
         root.addView(status, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(10) })
+
+        autoBtn = neonButton("⚡ অটো-জেনারেট: ON") {
+            autoOn = !autoOn
+            autoBtn.text = if (autoOn) "⚡ অটো-জেনারেট: ON" else "⚡ অটো-জেনারেট: OFF"
+            toast(if (autoOn) "অটো-জেনারেট চালু — লিখলেই ভয়েস হবে" else "অটো-জেনারেট বন্ধ")
+        }
+        root.addView(autoBtn, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(10) })
 
         generate = neonButton("✨ Generate Voice") { generateVoice() }
         root.addView(generate, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) })
@@ -133,6 +162,7 @@ class TtsActivity : Activity() {
             toast("Eleven v3-তে একবারে সর্বোচ্চ 3000 অক্ষর দিন"); return
         }
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(textInput.windowToken, 0)
+        lastAutoText = txt
         generate.isEnabled = false
         status.text = "⏳ Voice তৈরি হচ্ছে…"
         val selectedModel = model.selectedItem.toString()
@@ -151,7 +181,8 @@ class TtsActivity : Activity() {
                     runOnUiThread {
                         lastAudio = f
                         generate.isEnabled = true
-                        status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB"
+                        Voices.addFile(this, f, "TTS: " + txt.take(30))
+                        status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB (My Voices-এ সেভ হয়েছে)"
                         playRouted(f)
                     }
                 } catch (e: Exception) {

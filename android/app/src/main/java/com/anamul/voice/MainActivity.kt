@@ -54,7 +54,7 @@ class MainActivity : Activity() {
         micStatus = neonText("🎙 Mic Mode: বন্ধ — স্পিকারে বাজছে", 13f, false).apply { gravity = Gravity.CENTER; setTextColor(0xFF9FFFFF.toInt()) }
         root.addView(micStatus, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
         val micBar = LinearLayout(this)
-        micBtn = neonButton("🎙 Mic Mode চালু করুন") { toggleMic() }
+        micBtn = neonButton("🎙 Mic Mode চালু") { toggleMic() }
         micBar.addView(micBtn, LinearLayout.LayoutParams(0, dp(46), 1f))
         micBar.addView(neonButton("🛡 Shizuku চেক") { checkShizuku() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
         root.addView(micBar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
@@ -72,12 +72,12 @@ class MainActivity : Activity() {
         volRow.addView(volBar, LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(6) })
         volRow.addView(neonButton("Max") { setMusicVolume(Int.MAX_VALUE); volBar.progress = musicVolumeMax(); toast("🔊 ভলিউম সর্বোচ্চ") }, LinearLayout.LayoutParams(dp(64), dp(40)))
         root.addView(volRow, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
-        // ---- ভয়েস যোগ + ব্যাকআপ + Shizuku অপশন ----
+        // ---- ভয়েস যোগ + ব্যাকআপ + Shizuku অপশন (দুই লাইনে — লেখা কাটে না) ----
         val addBar = LinearLayout(this)
-        addBar.addView(neonButton("➕ ভয়েস যোগ করুন") { pickVoices() }, LinearLayout.LayoutParams(0, dp(46), 1f))
+        addBar.addView(neonButton("➕ ভয়েস যোগ") { pickVoices() }, LinearLayout.LayoutParams(0, dp(46), 1f))
         addBar.addView(neonButton("📦 ব্যাকআপ") { backupMenu() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
-        addBar.addView(neonButton("🛡 Shizuku অপশন") { shizukuOptions() }, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(6) })
         root.addView(addBar, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
+        root.addView(neonButton("🛡 Shizuku অপশন") { shizukuOptions() }, LinearLayout.LayoutParams(-1, dp(46)).apply { topMargin = dp(6) })
         val cp = LinearLayout(this); val ci = neonInput("🎟 কুপন কোড")
         cp.addView(ci, LinearLayout.LayoutParams(0, -2, 1f)); cp.addView(neonButton("Redeem") { redeem(ci.text.toString()) }, LinearLayout.LayoutParams(dp(100), dp(46)))
         root.addView(cp, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) })
@@ -122,7 +122,7 @@ class MainActivity : Activity() {
             !MicInjector.hasPermission() -> "🎙 Mic Mode: Shizuku অনুমতি লাগবে — Shizuku চেক চাপুন"
             else -> "🎙 Mic Mode: বন্ধ — স্পিকারে বাজছে"
         }
-        if (::micBtn.isInitialized) micBtn.text = if (MicInjector.isMicActive()) "⏹ Mic Mode বন্ধ করুন" else "🎙 Mic Mode চালু করুন"
+        if (::micBtn.isInitialized) micBtn.text = if (MicInjector.isMicActive()) "⏹ Mic Mode বন্ধ" else "🎙 Mic Mode চালু"
     }
 
     private fun toggleMic() {

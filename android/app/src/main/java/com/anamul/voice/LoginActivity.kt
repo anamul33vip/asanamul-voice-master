@@ -19,6 +19,7 @@ class LoginActivity : Activity() {
         val st = neonText("", 13f, false)
         col.addView(key, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(20) })
         col.addView(neonButton("🔑 লগইন") { go(key.text.toString(), st, sp) }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(12) })
+        col.addView(neonButton("🔑 GET FREE KEY — ৬ ধাপে ফ্রি Key") { openUrl(SERVER.trimEnd('/') + "/getkey") }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(10) })
         col.addView(neonButton("🛒 Key কিনুন (Premium)") { openUrl("https://t.me/crackffpanel") }, LinearLayout.LayoutParams(-1, dp(50)).apply { topMargin = dp(10) })
         col.addView(st)
         setContentView(FrameLayout(this).apply { addView(Glow(this@LoginActivity)); addView(col) })

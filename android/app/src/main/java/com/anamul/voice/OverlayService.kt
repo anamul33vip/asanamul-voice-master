@@ -43,7 +43,12 @@ class OverlayService : Service() {
             }
             val nb = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
                 Notification.Builder(this, ch) else Notification.Builder(this)
-            startForeground(1, nb.setContentTitle("AS ANAMUL VOICE").setSmallIcon(android.R.drawable.ic_btn_speak_now).build())
+            val notif = nb.setContentTitle("AS ANAMUL VOICE").setSmallIcon(android.R.drawable.ic_btn_speak_now).build()
+            // Android 14 (targetSdk 34): টাইপ ছাড়া startForeground() করলে MissingForegroundServiceTypeException হয়।
+            if (Build.VERSION.SDK_INT >= 29)
+                startForeground(1, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
+            else
+                startForeground(1, notif)
             if (bubble == null) showBubble()
         } catch (e: Exception) {
             logCrash("overlay-start", e)

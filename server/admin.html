@@ -18,7 +18,7 @@ table{width:100%;font-size:12px;border-collapse:collapse}td,th{padding:6px;borde
 <div id="app" style="display:none">
 <div class="card"><h3>🎙️ TTS / Voice API</h3><div id="ttsInfo">Checking provider…</div><small>API Key নিরাপত্তার জন্য Server Environment Variable-এ রাখতে হবে; এখানে বা Android APK-তে নয়।</small></div>
 <div class="card"><h3>🔑 Key তৈরি</h3><div class="row"><input id="kn" placeholder="নাম (ইউজার)"><input id="kk" placeholder="কাস্টম Key (খালি = অটো)"></div>
-<div class="row"><input id="kd" type="number" placeholder="দিন (0 = আনলিমিটেড)" value="30"><input id="kc" type="number" placeholder="Credits" value="0"></div><button onclick="addKey()">➕ Key বানাও</button></div>
+<div class="row"><input id="kd" type="number" placeholder="দিন (0 = আনলিমিটেড)" value="30"><input id="kc" type="number" placeholder="Credits" value="0"></div><button onclick="addKey()">➕ Key বানাও</button><div id="newKey"></div></div>
 <div class="card x"><h3>👥 Keys</h3><table id="kt"></table></div>
 <div class="card"><h3>🎟 Coupon (মেয়াদ বাড়ানোর)</h3><div class="row"><input id="cd" type="number" placeholder="দিন" value="7"><input id="cc" type="number" placeholder="Credits" value="0"></div><button onclick="addCp()">➕ Coupon বানাও</button><div id="ct"></div></div>
 <div class="card"><h3>🎤 ভয়েস যোগ করো</h3><input id="vt" placeholder="ভয়েসের নাম"><label>অডিও (mp3/wav/m4a/ogg)</label><input id="va" type="file" accept="audio/*"><label>ছবি</label><input id="vi" type="file" accept="image/*">
@@ -33,13 +33,16 @@ async function login(){const r=await fetch('/admin/login',{method:'POST',body:JS
 const fd=t=>t?new Date(t*1000).toLocaleDateString():'∞';
 async function load(){const d=await api('/admin/data');
 $('kt').innerHTML='<tr><th>Key</th><th>নাম</th><th>মেয়াদ</th><th>Cr</th><th>ডিভাইস</th><th></th></tr>'+d.keys.map(k=>`<tr><td>${k.key}</td><td>${k.name}</td><td>${fd(k.expires)}</td><td>${k.credits}</td><td>${k.device?'🔒':'-'}</td><td>
-<button class=s onclick="ke('${k.key}',{addDays:30})">+30d</button><button class=s onclick="ke('${k.key}',{addCredits:10})">+10cr</button><button class=s onclick="ke('${k.key}',{resetDevice:1})">↺dev</button><button class=s onclick="ke('${k.key}',{banned:${!k.banned}})">${k.banned?'Unban':'Ban'}</button><button class=s onclick="kd('${k.key}')">🗑</button></td></tr>`).join('');
-$('ct').innerHTML=d.coupons.map(c=>`<div>${c.code} — ${c.days}d/${c.credits}cr ${c.used?'✅used':''}</div>`).join('');
+<button class=s onclick="copyTxt('${k.key}',this)">📋</button><button class=s onclick="ke('${k.key}',{addDays:30})">+30d</button><button class=s onclick="ke('${k.key}',{addCredits:10})">+10cr</button><button class=s onclick="ke('${k.key}',{resetDevice:1})">↺dev</button><button class=s onclick="ke('${k.key}',{banned:${!k.banned}})">${k.banned?'Unban':'Ban'}</button><button class=s onclick="kd('${k.key}')">🗑</button></td></tr>`).join('');
+$('ct').innerHTML=d.coupons.map(c=>`<div>${c.code} — ${c.days}d/${c.credits}cr ${c.used?'✅used':''} <button class=s onclick="copyTxt('${c.code}',this)">📋</button></div>`).join('');
 $('vl').innerHTML=d.voices.map(v=>`<div>${v.premium?'💎':'🆓'} ${v.title} <button class=s onclick="vd('${v.id}')">🗑</button></div>`).join('');
 $('ttsInfo').innerHTML=d.tts.configured?'🟢 ElevenLabs API configured · Model: '+d.tts.model+' · Max chars: '+d.tts.max_chars:'🔴 API Key not configured · Set ELEVENLABS_API_KEY on the server';
 for(const k in d.config){const e=$('c_'+k);if(e){e.type=='checkbox'?e.checked=d.config[k]:e.value=d.config[k]}}}
 const ke=async(k,o)=>{await api('/admin/key/edit',{key:k,...o});load()},kd=async k=>{if(confirm('Delete?')){await api('/admin/key/del',{key:k});load()}},vd=async id=>{await api('/admin/voice/del',{id});load()};
-async function addKey(){await api('/admin/key/add',{name:$('kn').value,key:$('kk').value,days:$('kd').value,credits:$('kc').value});load()}
+function copyTxt(t,btn){function done(){if(btn){btn.textContent='✅ কপি হয়েছে';setTimeout(function(){btn.textContent='📋'},1500)}}
+function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){alert(t)}document.body.removeChild(ta)}
+if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb)}else{fb()}}
+async function addKey(){const k=await api('/admin/key/add',{name:$('kn').value,key:$('kk').value,days:$('kd').value,credits:$('kc').value});$('newKey').innerHTML='নতুন Key: <b>'+k.key+'</b> <button class=s onclick="copyTxt(\''+k.key+'\',this)">📋 কপি করুন</button>';copyTxt(k.key);load()}
 async function addCp(){await api('/admin/coupon/add',{days:$('cd').value,credits:$('cc').value});load()}
 const b64=f=>new Promise(r=>{if(!f)return r('');const x=new FileReader;x.onload=()=>r(x.result.split(',')[1]);x.readAsDataURL(f)});
 async function addVoice(){const a=$('va').files[0],i=$('vi').files[0];await api('/admin/voice/add',{title:$('vt').value,premium:$('vp').checked,audioB64:await b64(a),audioExt:a?a.name.split('.').pop():'',imageB64:await b64(i),imageExt:i?i.name.split('.').pop():''});$('vt').value='';load()}

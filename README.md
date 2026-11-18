@@ -20,6 +20,14 @@ included here and is never copied or re-signed.
   Send (TTS to mic), volume slider + Max, Stop all. Main screen shows
   key days left, volume, Shizuku options dialog (status + diagnostics
   + setup guide). No real-person clone voices; users add their own audio.
+- v2.3.0 — Overlay FGS fix: the service now declares
+  foregroundServiceType="mediaPlayback" and starts foreground with that
+  type (Android 14 needs it — v2.2.0 crashed on Overlay tap without it).
+  Login screen has a GET FREE KEY button opening the server's /getkey
+  page: 6 steps (system check, device id, waits, YouTube Subscribe,
+  Telegram Join) then a 12h key is minted and auto-copied (one active
+  key per device, POST /api/web/mint). Admin panel: every key and coupon
+  has a 📋 copy button, and a new key shows a copy box + auto-copy.
 - Build with GitHub Actions: **Actions → Build APK → Run workflow**, enter the
   live backend URL as `server_url`. The APK is unsigned; it is signed with
   the owner's keystore before delivery.

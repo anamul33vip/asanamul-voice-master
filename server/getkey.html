@@ -1,0 +1,83 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>AS ANAMUL VOICE — FREE KEY</title>
+<style>
+body{margin:0;background:#05050c;color:#fff;font-family:system-ui,sans-serif;padding:16px;text-align:center}
+h1{background:linear-gradient(90deg,#0ff,#f0f,#ff0,#0f0,#0ff);background-size:300%;-webkit-background-clip:text;color:transparent;animation:m 4s linear infinite;font-size:26px}
+@keyframes m{to{background-position:300%}}
+.card{max-width:520px;margin:16px auto;background:#0b0b18;border:2px solid #f0f;border-radius:16px;padding:18px}
+.bar{display:flex;gap:4px;margin:10px 0}.bar div{flex:1;height:8px;background:#222;border-radius:4px}.bar div.on{background:linear-gradient(90deg,#f0f,#0ff)}
+.big{font-size:34px;font-weight:900;color:#0ff;margin:8px 0}
+button{background:linear-gradient(90deg,#f0f,#0ff);border:0;border-radius:12px;padding:14px 20px;font-size:17px;font-weight:700;color:#000;width:100%;margin:8px 0;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+a.btn{display:block;background:#12122a;border:1px solid #f0f;border-radius:12px;padding:14px;color:#0ff;text-decoration:none;font-weight:700;margin:8px 0}
+.key{font-family:monospace;font-size:22px;word-break:break-all;background:#000;border:1px dashed #0ff;border-radius:10px;padding:14px;margin:10px 0}
+small{color:#aaa;line-height:1.6}
+</style></head><body>
+<h1>⚡ AS ANAMUL VOICE</h1>
+<p>🔑 ফ্রি Key — ৬টি ধাপ শেষ করলেই Key পাবেন (১২ ঘণ্টা)</p>
+<div class="card">
+<div class="bar" id="bar"><div></div><div></div><div></div><div></div><div></div><div></div></div>
+<div id="step"></div>
+<div id="out"></div>
+<small>নোট: YouTube Subscribe যাচাই করা যায় না — Subscribe চাপুন, ৭ সেকেন্ড অপেক্ষা করুন, তারপর কনফার্ম চাপুন। এক ডিভাইসে একটাই ফ্রি Key (১২ ঘণ্টা)।</small>
+</div>
+<script>
+var dev='';
+try{dev=localStorage.getItem('amv_device')||''}catch(e){}
+if(!dev){var ch='abcdef0123456789';for(var i=0;i<16;i++){dev+=ch[Math.floor(Math.random()*16)]}try{localStorage.setItem('amv_device',dev)}catch(e){}}
+var cur=0, timer=null;
+var steps=[
+ {t:'ধাপ ১/৬ — সিস্টেম চেক', d:'সার্ভারের সাথে সংযোগ যাচাই হচ্ছে…', s:30, run:check},
+ {t:'ধাপ ২/৬ — ডিভাইস আইডি', d:'আপনার ডিভাইস আইডি:', s:15, showDev:true},
+ {t:'ধাপ ৩/৬ — অপেক্ষা করুন', d:'সার্ভার তৈরি হচ্ছে…', s:30},
+ {t:'ধাপ ৪/৬ — অপেক্ষা করুন', d:'প্রায় হয়ে গেছে…', s:15},
+ {t:'ধাপ ৫/৬ — YouTube Subscribe', d:'নিচের বোতাম চেপে Subscribe করুন, তারপর ৭ সেকেন্ড পর কনফার্ম চাপুন।', s:7, yt:true},
+ {t:'ধাপ ৬/৬ — Telegram Join', d:'নিচের বোতাম চেপে Join করুন, তারপর ৭ সেকেন্ড পর কনফার্ম চাপুন।', s:7, tg:true}
+];
+function $(id){return document.getElementById(id)}
+function bar(){var b=$('bar').children;for(var i=0;i<b.length;i++){b[i].className=i<cur?'on':''}}
+function xhr(method,url,data,cb){var x=new XMLHttpRequest();x.open(method,url,true);x.setRequestHeader('Content-Type','application/json');x.onreadystatechange=function(){if(x.readyState===4){cb(x.status,x.responseText)}};x.send(data?JSON.stringify(data):null)}
+function check(cb){xhr('GET','/healthz',null,function(st){cb(st===200)})}
+function showStep(){
+ bar();
+ var st=steps[cur];
+ var h='<h2>'+st.t+'</h2><p>'+st.d+'</p>';
+ if(st.showDev){h+='<div class="key">'+dev+'</div>'}
+ if(st.yt){h+='<a class="btn" href="https://www.youtube.com/@Anamul_Islamic_Echo" target="_blank">▶ YouTube Subscribe</a>'}
+ if(st.tg){h+='<a class="btn" href="https://t.me/crackffpanel" target="_blank">✈ Telegram Join</a>'}
+ h+='<div class="big" id="cd">'+st.s+'</div>';
+ h+='<button id="nx" disabled>পরের ধাপ ⏳ <span id="cd2">'+st.s+'</span> সেকেন্ড</button>';
+ $('step').innerHTML=h;
+ if(st.run){st.run(function(ok){if(!ok){$('step').innerHTML='<h2>❌ সার্ভার পাওয়া যাচ্ছে না</h2><p>একটু পরে আবার চেষ্টা করুন।</p><button onclick="location.reload()">🔄 আবার চেষ্টা করুন</button>';return}count()})}else{count()}
+ function count(){
+  var left=st.s;
+  timer=setInterval(function(){
+   left--;
+   var a=$('cd'),b=$('cd2');
+   if(a)a.textContent=left;
+   if(b)b.textContent=left;
+   if(left<=0){clearInterval(timer);var nx=$('nx');nx.disabled=false;nx.innerHTML='পরের ধাপ ➤'}
+  },1000);
+ }
+ var nxBtn=$('nx'); if(nxBtn){nxBtn.onclick=function(){cur++;if(cur<steps.length){showStep()}else{mint()}}};
+}
+function copyTxt(t,btn){
+ function done(){if(btn){btn.textContent='✅ কপি হয়েছে';setTimeout(function(){btn.textContent='📋 কপি করুন'},2000)}}
+ function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done()}catch(e){}document.body.removeChild(ta)}
+ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(done,fb)}else{fb()}
+}
+function mint(){
+ $('step').innerHTML='<h2>⏳ Key বানানো হচ্ছে…</h2>';
+ xhr('POST','/api/web/mint',{device:dev},function(st,txt){
+  var r={};try{r=JSON.parse(txt)}catch(e){}
+  if(st!==200||!r.ok){
+   $('step').innerHTML='<h2>❌ Key হয়নি</h2><p>'+(r.error==='rate_limited'?'একটু পরে আবার চেষ্টা করুন।':'আবার চেষ্টা করুন।')+'</p><button onclick="mint()">🔄 আবার চেষ্টা করুন</button>';
+   return;
+  }
+  var exp=new Date(r.expires_epoch*1000).toLocaleString();
+  $('step').innerHTML='<h2>✅ আপনার Key তৈরি!</h2><p>মেয়াদ: '+exp+' (১২ ঘণ্টা)'+(r.again?' — আগের Key-ই ফেরত দেওয়া হয়েছে':'')+'</p><div class="key" id="k">'+r.key+'</div><button id="cp">📋 কপি করুন</button><p>অ্যাপে গিয়ে এই Key বসিয়ে লগইন করুন।</p>';
+  copyTxt(r.key);
+  $('cp').onclick=function(){copyTxt(r.key,this)};
+ });
+}
+showStep();
+</script></body></html>

@@ -10,6 +10,7 @@ const ELEVENLABS_MODEL_ID=process.env.ELEVENLABS_MODEL_ID||'eleven_v3';
 const TTS_MAX_CHARS=Math.max(100,Math.min(10000,Number(process.env.TTS_MAX_CHARS||3000)));
 const TTS_CREDITS_PER_REQUEST=Math.max(0,Number(process.env.TTS_CREDITS_PER_REQUEST||0));
 const ttsLastRequest=new Map();
+const mintLast=new Map();
 const DB_FILE=path.join(__dirname,'db.json'), UP=path.join(__dirname,'uploads');
 fs.mkdirSync(UP,{recursive:true});
 const defaults={keys:[],voices:[],coupons:[],config:{notice:'স্বাগতম!',tts_enabled:!!ELEVENLABS_API_KEY,tts_max_chars:TTS_MAX_CHARS,tts_voice_id:'',tts_model_id:ELEVENLABS_MODEL_ID,telegram:'https://t.me/crackffpanel',youtube:'https://www.youtube.com/@AnamulModzOfficial',buy_link:'https://t.me/crackffpanel',version:1,update_url:'',update_required:false}};
@@ -29,6 +30,20 @@ http.createServer(async(q,r)=>{
  if(q.method==='OPTIONS')return send(r,200,{});
  try{
  if(p==='/'||p==='/admin')return send(r,200,fs.readFileSync(path.join(__dirname,'admin.html'),'utf8'),'text/html; charset=utf-8');
+ if(p==='/healthz')return send(r,200,{ok:true});
+ if(p==='/getkey')return send(r,200,fs.readFileSync(path.join(__dirname,'getkey.html'),'utf8'),'text/html; charset=utf-8');
+ if(p==='/api/web/mint'&&q.method==='POST'){
+  const ip=(q.headers['x-forwarded-for']||q.socket.remoteAddress||'').split(',')[0].trim();
+  const last=mintLast.get(ip)||0;
+  if(Date.now()-last<12000)return send(r,429,{ok:false,error:'rate_limited'});
+  mintLast.set(ip,Date.now());
+  const b=await body(q),dev=String(b.device||'').trim().slice(0,100);
+  if(!dev)return send(r,400,{ok:false,error:'device_required'});
+  const ex=db.keys.find(x=>x.device===dev&&!x.banned&&x.expires&&x.expires>now());
+  if(ex)return send(r,200,{ok:true,key:ex.key,expires_epoch:ex.expires,again:true});
+  const k={key:'ANM-'+rid(4).toUpperCase(),name:'Web Free',credits:0,expires:now()+12*3600,device:dev,banned:false,created:now()};
+  db.keys.push(k);save();
+  return send(r,200,{ok:true,key:k.key,expires_epoch:k.expires,again:false})}
  if(p.startsWith('/files/')){const f=path.join(UP,path.basename(p));if(!fs.existsSync(f))return send(r,404,{});r.writeHead(200);return fs.createReadStream(f).pipe(r)}
  // ---------- APP API ----------
  if(p==='/api/app/login'&&q.method==='POST'){

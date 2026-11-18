@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private lateinit var searchInput: EditText
     private var localVoices = mutableListOf<Voices.V>()
     private var searchQuery = ""
+    private var pendingThumb: Voices.V? = null
 
     // Shizuku অনুমতির উত্তর এলে Mic স্ট্যাটাস আপডেট হয়।
     private val permListener = Shizuku.OnRequestPermissionResultListener { requestCode, grantResult ->
@@ -43,9 +44,10 @@ class MainActivity : Activity() {
         localVoices = Voices.load(this)
         val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(14), dp(28), dp(14), dp(10)) }
 
-        // ---- ওপরের স্ট্যাটাস কার্ড: লোগো + Key মেয়াদ ----
+        // ---- ওপরের স্ট্যাটাস কার্ড: লোগো (RGB রিং) + Key মেয়াদ ----
         val headRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
-        headRow.addView(ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_CROP }, LinearLayout.LayoutParams(dp(56), dp(56)))
+        val logoImg = ImageView(this).apply { setImageResource(R.drawable.logo); scaleType = ImageView.ScaleType.CENTER_CROP; layoutParams = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT) }
+        headRow.addView(RgbFrame(this, logoImg, 90f), LinearLayout.LayoutParams(dp(62), dp(62)))
         val headCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         headCol.addView(neonText("⚡ AS ANAMUL VOICE", 20f))
         info = neonText("", 12f, false).apply { setTextColor(0xFF9FFFFF.toInt()) }
@@ -58,7 +60,7 @@ class MainActivity : Activity() {
         // ---- Injector কার্ড: বড় ON/OFF টগল ----
         val injRow = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(6), dp(6), dp(6), dp(6)) }
         injRow.addView(neonText("⚡ Injector", 16f), LinearLayout.LayoutParams(0, -2, 1f))
-        micBtn = neonButton("Injector: OFF") { toggleMic() }
+        micBtn = rgbButton("Injector: OFF") { toggleMic() }
         injRow.addView(micBtn, LinearLayout.LayoutParams(dp(150), dp(46)))
         val injCol = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         injCol.addView(injRow)
@@ -122,8 +124,11 @@ class MainActivity : Activity() {
         refreshCrashLine()
     }
 
-    override fun onResume() { super.onResume(); refreshMic(); localVoices = Voices.load(this); render(); refreshCrashLine() }
+    override fun onResume() { super.onResume(); refreshMic(); localVoices = Voices.load(this); render(); refreshCrashLine(); refreshQuiet() }
     override fun onDestroy() { try { Shizuku.removeRequestPermissionResultListener(permListener) } catch (_: Exception) {}; super.onDestroy() }
+
+    /** Admin থেকে ক্রেডিট/মেয়াদ বদলালে অ্যাপ খুললেই নতুন মান দেখাবে (কোনো টোস্ট ছাড়া)। */
+    private fun refreshQuiet() = Thread { if (Api.loadConfig()) runOnUiThread { render() } }.start()
 
     private fun refreshCrashLine() {
         val last = readCrashLogLast()
@@ -245,6 +250,16 @@ class MainActivity : Activity() {
                     runOnUiThread { render(); toast(if (added > 0) "✅ ${added}টি ভয়েস যোগ হয়েছে" else "❌ কোনো ভয়েস যোগ হয়নি — অডিও/ভিডিও ফাইল দিন") }
                 }.start()
             }
+            PICK_THUMB -> {
+                val uri = data.data ?: return
+                val v = pendingThumb ?: return
+                pendingThumb = null
+                Thread {
+                    val nv = Voices.setThumb(this, localVoices, v, uri)
+                    localVoices = Voices.load(this)
+                    runOnUiThread { render(); toast(if (nv != null) "✅ থাম্বনেইল বসানো হয়েছে" else "❌ থাম্বনেইল হয়নি") }
+                }.start()
+            }
             EXPORT_BACKUP -> {
                 val uri = data.data ?: return
                 Thread {
@@ -287,7 +302,7 @@ class MainActivity : Activity() {
             Api.voices.forEach { v -> list.addView(card(v, premium), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
         }
         val shown = if (searchQuery.isEmpty()) localVoices else localVoices.filter { it.title.contains(searchQuery, ignoreCase = true) }
-        list.addView(neonText("🎵 আমার ভয়েস (${shown.size}) — চাপলে বাজবে, চেপে ধরলে Rename/Delete", 14f).apply { setTextColor(0xFF9FFFFF.toInt()) },
+        list.addView(neonText("🎵 আমার ভয়েস (${shown.size}) — চাপলে বাজবে, চেপে ধরলে Rename/Delete/Thumbnail", 14f).apply { setTextColor(0xFF9FFFFF.toInt()) },
             LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         shown.forEach { v -> list.addView(localCard(v), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(8) }) }
         if (Api.voices.isEmpty() && localVoices.isEmpty()) list.addView(neonText("কোনো ভয়েস নেই। ➕ ভয়েস যোগ চাপুন, বা 🔊 টেস্ট সাউন্ড বাজান।", 14f))
@@ -305,7 +320,16 @@ class MainActivity : Activity() {
 
     private fun localCard(v: Voices.V): FrameLayout {
         val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(10), dp(10), dp(10), dp(10)) }
-        row.addView(neonText("🎵", 22f), LinearLayout.LayoutParams(dp(40), dp(40)))
+        val thumb = Voices.thumbFile(this, v)
+        var thumbShown = false
+        if (thumb != null) {
+            val bmp = try { BitmapFactory.decodeFile(thumb.path, BitmapFactory.Options().apply { inSampleSize = 4 }) } catch (_: Exception) { null }
+            if (bmp != null) {
+                row.addView(ImageView(this).apply { setImageBitmap(bmp); scaleType = ImageView.ScaleType.CENTER_CROP }, LinearLayout.LayoutParams(dp(52), dp(52)))
+                thumbShown = true
+            }
+        }
+        if (!thumbShown) row.addView(neonText("🎵", 22f), LinearLayout.LayoutParams(dp(40), dp(40)))
         val tag = when (v.source) { "video" -> " 🎬" ; "tts" -> " ✨" ; else -> "" }
         row.addView(neonText(v.title + tag, 16f), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(12) })
         val frame = RgbFrame(this, row)
@@ -323,8 +347,14 @@ class MainActivity : Activity() {
                 if (t.isNotEmpty()) { Voices.rename(this, localVoices, v, t); render(); toast("✅ নাম বদলে গেছে") }
             }
             .setNegativeButton("🗑 Delete") { _, _ -> Voices.delete(this, localVoices, v); render(); toast("🗑 মুছে গেছে") }
-            .setNeutralButton("বাতিল", null)
+            .setNeutralButton("🖼 থাম্বনেইল") { _, _ -> pickThumb(v) }
             .show()
+    }
+
+    private fun pickThumb(v: Voices.V) {
+        pendingThumb = v
+        val i = Intent(Intent.ACTION_GET_CONTENT).apply { type = "image/*" }
+        startActivityForResult(Intent.createChooser(i, "থাম্বনেইল ছবি বেছে নিন"), PICK_THUMB)
     }
 
     private fun playLocal(v: Voices.V) {
@@ -351,5 +381,6 @@ class MainActivity : Activity() {
         private const val PICK_VOICES = 7021
         private const val EXPORT_BACKUP = 7022
         private const val IMPORT_BACKUP = 7023
+        private const val PICK_THUMB = 7024
     }
 }

@@ -126,8 +126,8 @@ class OverlayService : Service() {
         head.addView(neonText("AS ANAMUL VOICE", 16f), LinearLayout.LayoutParams(0, -2, 1f).apply { marginStart = dp(8) })
         col.addView(head)
 
-        // বড় Injector টগল
-        injectBtn = neonButton(injectLabel()) { toggleInject() }
+        // বড় Injector টগল (ঘুরন্ত RGB)
+        injectBtn = rgbButton(injectLabel()) { toggleInject() }
         col.addView(injectBtn, LinearLayout.LayoutParams(-1, dp(48)).apply { topMargin = dp(8) })
 
         // Tabs
@@ -140,21 +140,13 @@ class OverlayService : Service() {
 
         // Sound cards tab
         soundBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val ok = Api.expires == 0L || Api.expires > System.currentTimeMillis() / 1000
-        val local = Voices.load(this)
-        if (local.isEmpty() && Api.voices.isEmpty()) {
-            soundBox!!.addView(neonText("কোনো ভয়েস নেই — অ্যাপে গিয়ে ➕ ভয়েস যোগ করুন, বা 🔊 টেস্ট সাউন্ড বাজান", 12f, false))
-        }
-        local.forEach { v ->
-            soundBox!!.addView(neonButton("▶ " + v.title) { playLocal(v) },
-                LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(4) })
-        }
-        Api.voices.forEach { v ->
-            soundBox!!.addView(neonButton("▶ " + (if (v.optBoolean("premium")) "💎 " else "") + v.optString("title")) { playServer(v, ok) },
-                LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(4) })
-        }
+        val soundTop = LinearLayout(this)
+        soundTop.addView(neonButton("🔄 রিফ্রেশ") { buildSoundList() }, LinearLayout.LayoutParams(0, dp(40), 1f))
+        soundTop.addView(neonButton("🔊 টেস্ট সাউন্ড") { testSound() }, LinearLayout.LayoutParams(0, dp(40), 1f).apply { marginStart = dp(6) })
+        col.addView(soundTop, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(6) })
+        buildSoundList()
         val soundScroll = ScrollView(this).apply { addView(soundBox) }
-        col.addView(soundScroll, LinearLayout.LayoutParams(-1, dp(200)).apply { topMargin = dp(6) })
+        col.addView(soundScroll, LinearLayout.LayoutParams(-1, dp(180)).apply { topMargin = dp(6) })
 
         // Type & send tab (hidden first)
         typeBox = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; visibility = View.GONE }
@@ -222,6 +214,44 @@ class OverlayService : Service() {
         refreshInjectBtn()
     }
 
+    /** ওভারলেতে সাউন্ড লিস্ট নতুন করে সাজানো — অ্যাপে ভয়েস যোগ করার পর রিফ্রেশ চাপলেই দেখা যাবে। */
+    private fun buildSoundList() {
+        val box = soundBox ?: return
+        try {
+            box.removeAllViews()
+            val ok = Api.expires == 0L || Api.expires > System.currentTimeMillis() / 1000
+            val local = Voices.load(this)
+            if (local.isEmpty() && Api.voices.isEmpty()) {
+                box.addView(neonText("কোনো ভয়েস নেই — অ্যাপে গিয়ে ➕ ভয়েস যোগ করুন, বা 🔊 টেস্ট সাউন্ড বাজান", 12f, false))
+                return
+            }
+            local.forEach { v ->
+                val row = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL }
+                val thumb = Voices.thumbFile(this, v)
+                if (thumb != null) {
+                    val bmp = try { android.graphics.BitmapFactory.decodeFile(thumb.path, android.graphics.BitmapFactory.Options().apply { inSampleSize = 4 }) } catch (_: Exception) { null }
+                    if (bmp != null) row.addView(ImageView(this).apply { setImageBitmap(bmp); scaleType = ImageView.ScaleType.CENTER_CROP }, LinearLayout.LayoutParams(dp(36), dp(36)))
+                }
+                row.addView(neonButton("▶ " + v.title) { playLocal(v) }, LinearLayout.LayoutParams(0, dp(42), 1f).apply { marginStart = dp(6) })
+                box.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
+            }
+            Api.voices.forEach { v ->
+                box.addView(neonButton("▶ " + (if (v.optBoolean("premium")) "💎 " else "") + v.optString("title")) { playServer(v, ok) },
+                    LinearLayout.LayoutParams(-1, dp(42)).apply { topMargin = dp(4) })
+            }
+        } catch (e: Exception) { logCrash("overlay-sound-list", e) }
+    }
+
+    private fun testSound() {
+        Thread {
+            try {
+                val f = testToneFile()
+                playRouted(f)
+                main.post { toast(if (MicInjector.isMicActive()) "🔊 টেস্ট সাউন্ড — মাইকে যাচ্ছে" else "🔊 টেস্ট সাউন্ড — স্পিকারে বাজছে") }
+            } catch (e: Exception) { logCrash("overlay-test-sound", e) }
+        }.start()
+    }
+
     private fun showTab(sound: Boolean) {
         soundBox?.visibility = if (sound) View.VISIBLE else View.GONE
         typeBox?.visibility = if (sound) View.GONE else View.VISIBLE
@@ -275,7 +305,8 @@ class OverlayService : Service() {
     private fun sendTyped() {
         val txt = typeInput?.text?.toString()?.trim() ?: ""
         if (txt.isEmpty()) { toast("লেখা লিখুন"); return }
-        val vid = getSharedPreferences("tts_preferences", MODE_PRIVATE).getString("last_voice_id", "") ?: ""
+        var vid = getSharedPreferences("tts_preferences", MODE_PRIVATE).getString("last_voice_id", "") ?: ""
+        if (vid.isEmpty()) vid = Api.cfg?.optString("tts_voice_id", "") ?: ""
         if (vid.isEmpty()) { setTypeStatus("❌ Voice ID সেট করা নেই — অ্যাপের TTS স্ক্রিনে সেভ করুন"); return }
         if (!Api.ttsEnabled) { setTypeStatus("❌ TTS বন্ধ — সার্ভারে ElevenLabs Key সেট করা নেই"); return }
         if (autoBusy) return
@@ -298,7 +329,13 @@ class OverlayService : Service() {
                     val err = r.optString("error", "unknown")
                     main.post {
                         sendBtn?.isEnabled = true; autoBusy = false
-                        setTypeStatus(if (err == "tts_not_configured") "❌ সার্ভারে ElevenLabs Key সেট করা নেই" else "❌ Voice হয়নি: $err")
+                        setTypeStatus(when (err) {
+                            "tts_not_configured" -> "❌ সার্ভারে ElevenLabs Key সেট করা নেই"
+                            "provider_paid_plan_required" -> "❌ এই ভয়েস Free প্ল্যানে চলে না — অ্যাপের TTS স্ক্রিনে ✅ Free ভয়েস চাপুন"
+                            "provider_quota" -> "❌ ElevenLabs-এর মাসিক ক্রেডিট শেষ হয়েছে"
+                            "provider_rate_limited" -> "❌ একটু পরে আবার চেষ্টা করুন"
+                            else -> "❌ Voice হয়নি: $err"
+                        })
                     }
                 }
             } catch (e: Exception) {

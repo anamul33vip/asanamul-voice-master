@@ -31,6 +31,7 @@ class TtsActivity : Activity() {
     private var lastAudio: File? = null
     private var autoOn = true
     private var lastAutoText = ""
+    private var generating = false
     private val autoHandler = Handler(Looper.getMainLooper())
     private var autoTask: Runnable? = null
     private lateinit var autoBtn: Button
@@ -67,6 +68,7 @@ class TtsActivity : Activity() {
             }
         }
         root.addView(neonButton("💾 Save Voice ID") { saveVoiceId() }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
+        root.addView(neonButton("✅ Free ভয়েস ব্যবহার করুন") { useFreeVoice() }, LinearLayout.LayoutParams(-1, dp(44)).apply { topMargin = dp(6) })
 
         root.addView(neonText("AI Model", 14f), LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(12) })
         model = Spinner(this)
@@ -153,16 +155,28 @@ class TtsActivity : Activity() {
         toast("Voice ID সেভ হয়েছে")
     }
 
+    /** সার্ভারের ডিফল্ট (Free প্ল্যানে API দিয়ে চলে এমন) ভয়েস বসানো। */
+    private fun useFreeVoice() {
+        val d = Api.cfg?.optString("tts_voice_id", "") ?: ""
+        if (d.isEmpty()) { toast("ডিফল্ট ভয়েস পাওয়া যায়নি — Refresh করে আবার চেষ্টা করুন"); return }
+        voiceId.setText(d)
+        getSharedPreferences("tts_preferences", MODE_PRIVATE).edit().putString("last_voice_id", d).apply()
+        status.text = "✅ Free ভয়েস বসানো হয়েছে — এবার লিখে Generate করুন"
+        toast("✅ Free ভয়েস বসানো হয়েছে")
+    }
+
     private fun generateVoice() {
         val txt = textInput.text.toString().trim()
         val id = voiceId.text.toString().trim()
         if (txt.isEmpty()) { toast("লেখা লিখুন"); return }
         if (id.isEmpty()) { toast("Voice ID লিখুন"); return }
+        if (generating) return
         if (txt.length > 3000 && model.selectedItem.toString() == "eleven_v3") {
             toast("Eleven v3-তে একবারে সর্বোচ্চ 3000 অক্ষর দিন"); return
         }
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(textInput.windowToken, 0)
         lastAutoText = txt
+        generating = true
         generate.isEnabled = false
         status.text = "⏳ Voice তৈরি হচ্ছে…"
         val selectedModel = model.selectedItem.toString()
@@ -180,18 +194,20 @@ class TtsActivity : Activity() {
                     val f = Api.download(this, url, "tts_" + response.optString("id", System.currentTimeMillis().toString()) + ".mp3")
                     runOnUiThread {
                         lastAudio = f
+                        generating = false
                         generate.isEnabled = true
                         Voices.addFile(this, f, "TTS: " + txt.take(30))
                         status.text = "✅ Voice তৈরি হয়েছে — ${f.length() / 1024} KB (My Voices-এ সেভ হয়েছে)"
                         playRouted(f)
                     }
                 } catch (e: Exception) {
-                    runOnUiThread { generate.isEnabled = true; status.text = "❌ অডিও ডাউনলোড হয়নি: ${e.message}" }
+                    runOnUiThread { generating = false; generate.isEnabled = true; status.text = "❌ অডিও ডাউনলোড হয়নি: ${e.message}" }
                 }
             } else {
                 val err = response.optString("error", "unknown_error")
                 val detail = response.optString("detail", response.optString("message", ""))
                 runOnUiThread {
+                    generating = false
                     generate.isEnabled = true
                     status.text = when (err) {
                         "tts_not_configured" -> "❌ সার্ভারে ElevenLabs API Key সেট করা নেই।"
@@ -205,6 +221,9 @@ class TtsActivity : Activity() {
                         "expired" -> "⏳ Access Key-এর মেয়াদ শেষ।"
                         "provider_auth_failed" -> "❌ ElevenLabs API Key ভুল বা অনুমতি নেই।"
                         "provider_quota_or_plan" -> "❌ API credit/plan limit শেষ হয়েছে।"
+                        "provider_paid_plan_required" -> "❌ এই ভয়েস Free প্ল্যানে API দিয়ে চলে না। নিচের ✅ Free ভয়েস বোতাম চাপুন।"
+                        "provider_quota" -> "❌ ElevenLabs-এর মাসিক ক্রেডিট শেষ হয়েছে।"
+                        "provider_rate_limited" -> "⏳ একসাথে অনেক অনুরোধ — ১ মিনিট পরে আবার চেষ্টা করুন।"
                         else -> "❌ Voice তৈরি হয়নি: $err ${detail.take(160)}"
                     }
                 }

@@ -36,6 +36,22 @@ included here and is never copied or re-signed.
   in TTS screen and auto-send in the overlay type tab (type, pause 2s,
   voice generates and plays routed); built-in 🔊 test sound (no voice
   or server needed) to check the speaker/mic path.
+- v2.5.0 — BUGFIX + features: (1) addUri now SAVES the voice to the
+  library — v2.2.0–v2.4.0 copied the file but never saved the list, so
+  added voices never showed (toast said "added" anyway); (2) voice
+  thumbnails — long-press a voice → 🖼 থাম্বনেইল, shown on cards and
+  in the overlay; backup zip includes thumbs; (3) overlay sound tab
+  has 🔄 রিফ্রেশ + 🔊 টেস্ট সাউন্ড buttons; (4) app refreshes credits
+  quietly on every resume, so Admin +10cr shows without re-login;
+  (5) TTS: busy guard (no double requests), clear errors —
+  provider_paid_plan_required (library voice not allowed on Free),
+  provider_quota, provider_rate_limited — plus a ✅ Free ভয়েস button
+  that fills the server default voice; (6) RGB lighting: animated
+  gradient Injector button + RGB ring around the logo; (7) server:
+  Web Free keys start with 50 credits, TTS errors split 402/429.
+  NOTE: Rachel (library voice) is NOT usable on the Free plan via API
+  — 402 paid_plan_required, credits were fine (9,790/10,000 left);
+  default voice switched to a premade Free-usable voice.
 - Build with GitHub Actions: **Actions → Build APK → Run workflow**, enter the
   live backend URL as `server_url`. The APK is unsigned; it is signed with
   the owner's keystore before delivery.

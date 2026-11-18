@@ -22,8 +22,8 @@ import java.util.zip.ZipOutputStream
  * ব্যাকআপ নিজের .zip ফরম্যাটে (অন্য অ্যাপের .isfile ফরম্যাট নয়)।
  */
 object Voices {
-    data class V(val id: String, val title: String, val file: String, val source: String) {
-        fun toJson() = JSONObject().put("id", id).put("title", title).put("file", file).put("source", source)
+    data class V(val id: String, val title: String, val file: String, val source: String, val thumb: String = "") {
+        fun toJson() = JSONObject().put("id", id).put("title", title).put("file", file).put("source", source).put("thumb", thumb)
     }
 
     private const val META = "voices.json"
@@ -38,7 +38,7 @@ object Voices {
             val a = JSONArray(f.readText())
             for (i in 0 until a.length()) {
                 val o = a.getJSONObject(i)
-                out.add(V(o.optString("id"), o.optString("title"), o.optString("file"), o.optString("source", "audio")))
+                out.add(V(o.optString("id"), o.optString("title"), o.optString("file"), o.optString("source", "audio"), o.optString("thumb", "")))
             }
         } catch (_: Exception) {}
         return out
@@ -78,27 +78,36 @@ object Voices {
     }
 
     /** একটা ফাইল যোগ করা — অডিও হলে কপি, ভিডিও হলে অডিও ট্র্যাক বের করে .m4a বানানো হয়।
-     *  ভিডিও থেকে অডিও বের করা না গেলে আসল ভিডিও ফাইলটাই রাখা হয় (MediaPlayer ভিডিওর অডিও বাজাতে পারে)। */
+     *  ভিডিও থেকে অডিও বের করা না গেলে আসল ভিডিও ফাইলটাই রাখা হয় (MediaPlayer ভিডিওর অডিও বাজাতে পারে)।
+     *  যোগ করার সঙ্গে সঙ্গে লিস্টে সেভ হয় — নইলে যোগ করার পরও কিছু দেখাতো না (v2.5.0 বাগফিক্স)। */
     fun addUri(c: Context, uri: Uri): V? {
         val name = displayName(c, uri)
         val base = name.substringBeforeLast('.').ifEmpty { "Voice" }
         val id = System.currentTimeMillis().toString() + "_" + (0..999).random()
         return try {
-            if (isVideo(c, uri)) {
+            val made: V? = if (isVideo(c, uri)) {
                 val out = File(dir(c), "$id.m4a")
                 val ok = runCatching { extractAudio(c, uri, out) }.getOrDefault(false) && out.exists() && out.length() > 0
-                if (ok) return V(id, base, out.name, "video")
-                out.delete()
-                val ext2 = name.substringAfterLast('.', "mp4").lowercase().ifEmpty { "mp4" }
-                val out2 = File(dir(c), "$id.$ext2")
-                c.contentResolver.openInputStream(uri)?.use { inp -> out2.outputStream().use { inp.copyTo(it) } }
-                if (out2.exists() && out2.length() > 0) V(id, base, out2.name, "video") else null
+                if (ok) V(id, base, out.name, "video")
+                else {
+                    out.delete()
+                    val ext2 = name.substringAfterLast('.', "mp4").lowercase().ifEmpty { "mp4" }
+                    val out2 = File(dir(c), "$id.$ext2")
+                    c.contentResolver.openInputStream(uri)?.use { inp -> out2.outputStream().use { inp.copyTo(it) } }
+                    if (out2.exists() && out2.length() > 0) V(id, base, out2.name, "video") else null
+                }
             } else {
                 val ext = name.substringAfterLast('.', "mp3").lowercase().ifEmpty { "mp3" }
                 val out = File(dir(c), "$id.$ext")
                 c.contentResolver.openInputStream(uri)?.use { inp -> out.outputStream().use { inp.copyTo(it) } }
                 if (out.exists() && out.length() > 0) V(id, base, out.name, "audio") else null
             }
+            if (made != null) {
+                val list = load(c)
+                list.add(0, made)
+                save(c, list)
+            }
+            made
         } catch (_: Exception) { null }
     }
 
@@ -151,8 +160,32 @@ object Voices {
         }
     }
 
+    /** ভয়েসের থাম্বনেইল ছবি বদলানো — গ্যালারি থেকে ছবি নিয়ে কার্ডে দেখায়। */
+    fun setThumb(c: Context, list: MutableList<V>, v: V, uri: Uri): V? {
+        return try {
+            val name = displayName(c, uri)
+            val ext = name.substringAfterLast('.', "jpg").lowercase().ifEmpty { "jpg" }
+            val out = File(dir(c), v.id + "_thumb." + ext)
+            c.contentResolver.openInputStream(uri)?.use { inp -> out.outputStream().use { inp.copyTo(it) } }
+            if (!out.exists() || out.length() == 0L) return null
+            try { if (v.thumb.isNotEmpty()) { val old = File(dir(c), v.thumb); if (old.name != out.name) old.delete() } } catch (_: Exception) {}
+            val nv = v.copy(thumb = out.name)
+            val i = list.indexOfFirst { it.id == v.id }
+            if (i >= 0) list[i] = nv
+            save(c, list)
+            nv
+        } catch (_: Exception) { null }
+    }
+
+    fun thumbFile(c: Context, v: V): File? {
+        if (v.thumb.isEmpty()) return null
+        val f = File(dir(c), v.thumb)
+        return if (f.exists()) f else null
+    }
+
     fun delete(c: Context, list: MutableList<V>, v: V) {
         try { file(c, v).delete() } catch (_: Exception) {}
+        try { if (v.thumb.isNotEmpty()) File(dir(c), v.thumb).delete() } catch (_: Exception) {}
         list.removeAll { it.id == v.id }
         save(c, list)
     }
@@ -178,6 +211,14 @@ object Voices {
                     f.inputStream().use { it.copyTo(z) }
                     z.closeEntry()
                     n++
+                }
+                if (v.thumb.isNotEmpty()) {
+                    val tf = File(dir(c), v.thumb)
+                    if (tf.exists()) {
+                        z.putNextEntry(ZipEntry(v.thumb))
+                        tf.inputStream().use { it.copyTo(z) }
+                        z.closeEntry()
+                    }
                 }
             }
         }
@@ -215,7 +256,17 @@ object Voices {
                     val dest = File(dir(c), src.name)
                     val finalFile = if (dest.exists() && dest.name != oldFile) File(dir(c), id + "_" + oldFile) else dest
                     src.copyTo(finalFile, overwrite = true)
-                    list.add(V(id, o.optString("title", "Voice"), finalFile.name, o.optString("source", "audio")))
+                    var thumbName = ""
+                    val oldThumb = o.optString("thumb", "")
+                    if (oldThumb.isNotEmpty()) {
+                        val tsrc = File(tmp, oldThumb)
+                        if (tsrc.exists()) {
+                            val tdest = File(dir(c), id + "_thumb." + oldThumb.substringAfterLast('.', "jpg"))
+                            tsrc.copyTo(tdest, overwrite = true)
+                            thumbName = tdest.name
+                        }
+                    }
+                    list.add(V(id, o.optString("title", "Voice"), finalFile.name, o.optString("source", "audio"), thumbName))
                     added++
                 }
             } else {

@@ -89,6 +89,22 @@ fun Context.neonButton(t: String, onClick: () -> Unit) = Button(this).apply {
     background = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF00FF.toInt(), 0xFF00FFFF.toInt())).apply { cornerRadius = 60f }
     setOnClickListener { onClick() } }
 
+/** ঘুরন্ত RGB গ্রেডিয়েন্ট বোতাম — Injector টগলের মতো হাইলাইট বোতামের জন্য। */
+fun Context.rgbButton(t: String, onClick: () -> Unit) = Button(this).apply {
+    text = t; textSize = 13.5f; setSingleLine(true); ellipsize = android.text.TextUtils.TruncateAt.END
+    setTextColor(Color.BLACK); setTypeface(null, Typeface.BOLD); isAllCaps = false
+    val gd = GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT, intArrayOf(0xFFFF00FF.toInt(), 0xFF00FFFF.toInt(), 0xFF00FF66.toInt())).apply { cornerRadius = 60f }
+    background = gd
+    ValueAnimator.ofFloat(0f, 360f).apply { duration = 2500; repeatCount = -1; interpolator = null
+        addUpdateListener {
+            val a = it.animatedValue as Float
+            gd.colors = intArrayOf(
+                Color.HSVToColor(floatArrayOf(a % 360, 1f, 1f)),
+                Color.HSVToColor(floatArrayOf((a + 120) % 360, 1f, 1f)),
+                Color.HSVToColor(floatArrayOf((a + 240) % 360, 1f, 1f)))
+        }; start() }
+    setOnClickListener { onClick() } }
+
 /** বিল্ট-ইন টেস্ট সাউন্ড (১ সেকেন্ডের বিপ) — স্পিকার/মাইক পথ যাচাইয়ের জন্য, সার্ভার লাগে না। */
 fun Context.testToneFile(): File {
     val f = File(cacheDir, "test_tone.wav")

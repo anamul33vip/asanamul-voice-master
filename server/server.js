@@ -41,7 +41,7 @@ http.createServer(async(q,r)=>{
   if(!dev)return send(r,400,{ok:false,error:'device_required'});
   const ex=db.keys.find(x=>x.device===dev&&!x.banned&&x.expires&&x.expires>now());
   if(ex)return send(r,200,{ok:true,key:ex.key,expires_epoch:ex.expires,again:true});
-  const k={key:'ANM-'+rid(4).toUpperCase(),name:'Web Free',credits:0,expires:now()+12*3600,device:dev,banned:false,created:now()};
+  const k={key:'ANM-'+rid(4).toUpperCase(),name:'Web Free',credits:50,expires:now()+12*3600,device:dev,banned:false,created:now()};
   db.keys.push(k);save();
   return send(r,200,{ok:true,key:k.key,expires_epoch:k.expires,again:false})}
  if(p.startsWith('/files/')){const f=path.join(UP,path.basename(p));if(!fs.existsSync(f))return send(r,404,{});r.writeHead(200);return fs.createReadStream(f).pipe(r)}
@@ -84,7 +84,7 @@ http.createServer(async(q,r)=>{
     body:JSON.stringify({text:textValue,model_id:model,...(languageCode?{language_code:languageCode}:{}),voice_settings:{stability,similarity_boost:similarityBoost,style:0.15,use_speaker_boost:true}}),
     signal:AbortSignal.timeout(90000)
    });
-   if(!upstream.ok){const msg=(await upstream.text()).slice(0,500);console.error('TTS provider error',upstream.status,msg);const err=upstream.status===401||upstream.status===403?'provider_auth_failed':upstream.status===402||upstream.status===429?'provider_quota_or_plan':'tts_provider_error';return send(r,502,{ok:false,error:err,provider_status:upstream.status,message:'Voice provider rejected the request. Check Voice ID, API access and quota.'})}
+   if(!upstream.ok){const msg=(await upstream.text()).slice(0,500);console.error('TTS provider error',upstream.status,msg);let err='tts_provider_error';try{const j=JSON.parse(msg);if(j.detail&&j.detail.code==='paid_plan_required')err='provider_paid_plan_required'}catch(_){} if(err==='tts_provider_error')err=upstream.status===401||upstream.status===403?'provider_auth_failed':upstream.status===402?'provider_quota':upstream.status===429?'provider_rate_limited':'tts_provider_error';return send(r,502,{ok:false,error:err,provider_status:upstream.status,message:'Voice provider rejected the request. Check Voice ID, API access and quota.'})}
    const audio=Buffer.from(await upstream.arrayBuffer());
    if(!audio.length)return send(r,502,{ok:false,error:'empty_audio'});
    const file=rid(12)+'.mp3';fs.writeFileSync(path.join(UP,file),audio);

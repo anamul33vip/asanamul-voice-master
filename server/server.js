@@ -14,7 +14,7 @@ const mintLast=new Map();
 const DB_FILE=path.join(__dirname,'db.json'), UP=path.join(__dirname,'uploads');
 fs.mkdirSync(UP,{recursive:true});
 const defaults={keys:[],voices:[],coupons:[],voiceProfiles:[],config:{notice:'স্বাগতম!',tts_enabled:!!ELEVENLABS_API_KEY,tts_max_chars:TTS_MAX_CHARS,tts_voice_id:'',tts_model_id:ELEVENLABS_MODEL_ID,telegram:'https://t.me/crackffpanel',youtube:'https://www.youtube.com/@AnamulModzOfficial',buy_link:'https://t.me/crackffpanel',version:1,update_url:'',update_required:false,
-app_version:'2.6.0',apk_url:'',release_note:'নতুন আপডেট সিস্টেম: Admin থেকে Version + APK URL + Release Note দিলেই ইউজার অ্যাপে Update দেখাবে। Voice Profiles যোগ হয়েছে।',active_voice_profile_id:''}};
+app_version:'2.6.1',apk_url:'',release_note:'v2.6.1: লঞ্চ ক্র্যাশ ঠিক করা হয়েছে। নতুন আপডেট সিস্টেম: Admin থেকে Version + APK URL + Release Note দিলেই ইউজার অ্যাপে Update দেখাবে। Voice Profiles যোগ হয়েছে।',active_voice_profile_id:''}};
 let db=defaults;
 if(fs.existsSync(DB_FILE))db=JSON.parse(fs.readFileSync(DB_FILE));
 db.keys ||= []; db.voices ||= []; db.coupons ||= []; db.voiceProfiles ||= []; db.config={...defaults.config,...(db.config||{})};

@@ -210,7 +210,7 @@ class MainActivity : Activity() {
                     var added = 0
                     uris.forEach { u -> try { if (Voices.addUri(this, u) != null) added++ } catch (_: Exception) {} }
                     localVoices = Voices.load(this)
-                    runOnUiThread { render(); toast(if (added > 0) "✅ $addedটি ভয়েস যোগ হয়েছে" else "❌ কোনো ভয়েস যোগ হয়নি") }
+                    runOnUiThread { render(); toast(if (added > 0) "✅ ${added}টি ভয়েস যোগ হয়েছে" else "❌ কোনো ভয়েস যোগ হয়নি") }
                 }.start()
             }
             EXPORT_BACKUP -> {
@@ -219,7 +219,7 @@ class MainActivity : Activity() {
                     try {
                         contentResolver.openOutputStream(uri)?.use { out ->
                             val n = Voices.exportZip(this, localVoices, out)
-                            runOnUiThread { toast("✅ ব্যাকআপ হয়েছে — $nটি ভয়েস") }
+                            runOnUiThread { toast("✅ ব্যাকআপ হয়েছে — ${n}টি ভয়েস") }
                         }
                     } catch (e: Exception) { runOnUiThread { toast("❌ ব্যাকআপ হয়নি: ${e.message}") } }
                 }.start()
@@ -232,7 +232,7 @@ class MainActivity : Activity() {
                         contentResolver.openInputStream(uri)?.use { inp ->
                             val n = Voices.importZip(this, localVoices, inp)
                             localVoices = Voices.load(this)
-                            runOnUiThread { render(); toast(if (n > 0) "✅ $nটি ভয়েস ফেরানো হয়েছে" else "❌ ব্যাকআপে কোনো ভয়েস পাওয়া যায়নি") }
+                            runOnUiThread { render(); toast(if (n > 0) "✅ ${n}টি ভয়েস ফেরানো হয়েছে" else "❌ ব্যাকআপে কোনো ভয়েস পাওয়া যায়নি") }
                         }
                     } catch (e: Exception) { runOnUiThread { toast("❌ Import হয়নি: ${e.message}") } }
                 }.start()

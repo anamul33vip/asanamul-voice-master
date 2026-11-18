@@ -1,4 +1,4 @@
-# AS ANAMUL VOICE — Master (v2.1.0)
+# AS ANAMUL VOICE — Master (v2.2.0)
 
 Original Kotlin Android app (`com.anamul.voice`) + zero-dependency Node.js
 API/admin backend. The reference APK in the original MASTER zip is NOT
@@ -12,6 +12,14 @@ included here and is never copied or re-signed.
   AudioPolicy LOOP_BACK|RENDER) routes sounds into the microphone; when Mic
   Mode is off, playback is speaker-only. Needs the Shizuku app running +
   one Allow tap in Shizuku; mic result must be ear-tested in-game.
+- v2.2.0 — My Voices library (own code, own design): add audio files
+  (multi-pick), extract audio from video (MediaExtractor), cards with
+  play / long-press rename-delete, search, export/import backup as own
+  .zip format. Overlay panel rebuilt crash-safe (any error is Toast +
+  log file, never a crash): Inject ON/OFF toggle, sound cards, Type &
+  Send (TTS to mic), volume slider + Max, Stop all. Main screen shows
+  key days left, volume, Shizuku options dialog (status + diagnostics
+  + setup guide). No real-person clone voices; users add their own audio.
 - Build with GitHub Actions: **Actions → Build APK → Run workflow**, enter the
   live backend URL as `server_url`. The APK is unsigned; it is signed with
   the owner's keystore before delivery.

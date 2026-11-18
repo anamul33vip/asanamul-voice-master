@@ -19,7 +19,7 @@ import java.net.URL
  */
 object MasterLink {
     private const val DB = "https://as-anamul-admin-default-rtdb.firebaseio.com"
-    private const val VERSION = "2.1.0"
+    private const val VERSION = "2.2.0"
 
     fun sync(a: Activity, appId: String) {
         Thread {

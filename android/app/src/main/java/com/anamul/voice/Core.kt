@@ -98,3 +98,44 @@ class Glow(c: Context) : View(c) { private var a = 0f
     override fun onDraw(cv: Canvas) { cv.drawColor(0xFF05050C.toInt())
         for (i in 0..1) { val t = Math.toRadians((a + i * 180).toDouble()); val x = width / 2f + Math.cos(t).toFloat() * width / 2; val y = height / 2f + Math.sin(t).toFloat() * height / 3
             p.shader = RadialGradient(x, y, width * 0.8f, Color.HSVToColor(70, floatArrayOf((a * 2 + i * 120) % 360, 1f, 1f)), 0, Shader.TileMode.CLAMP); cv.drawRect(0f, 0f, width.toFloat(), height.toFloat(), p) } } }
+
+// ====== Crash log + ভলিউম সাহায্যকারী (v2.2.0) ======
+/** কোনো ভুল হলে অ্যাপ না ভেঙে লগ ফাইলে লিখে রাখা — Main স্ক্রিনে শেষ লাইন দেখা যায়। */
+fun Context.logCrash(tag: String, e: Throwable) {
+    try {
+        val d = File(getExternalFilesDir(null), "logs").apply { mkdirs() }
+        val f = File(d, "app_crash.log")
+        val stamp = java.text.SimpleDateFormat("dd MMM HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())
+        f.appendText("[$stamp] $tag: ${e.javaClass.simpleName}: ${e.message}\n")
+        val lines = f.readLines()
+        if (lines.size > 60) f.writeText(lines.takeLast(60).joinToString("\n") + "\n")
+    } catch (_: Exception) {}
+}
+
+fun Context.readCrashLogLast(): String? {
+    return try {
+        val f = File(File(getExternalFilesDir(null), "logs"), "app_crash.log")
+        if (!f.exists()) null else f.readLines().lastOrNull { it.isNotBlank() }
+    } catch (_: Exception) { null }
+}
+
+fun Context.clearCrashLog() {
+    try { File(File(getExternalFilesDir(null), "logs"), "app_crash.log").delete() } catch (_: Exception) {}
+}
+
+/** মিউজিক ভলিউম (STREAM_MUSIC) — গেমের সাউন্ডের জন্য। */
+fun Context.musicVolumeMax(): Int {
+    return try { (getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC) } catch (_: Exception) { 15 }
+}
+
+fun Context.musicVolume(): Int {
+    return try { (getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager).getStreamVolume(android.media.AudioManager.STREAM_MUSIC) } catch (_: Exception) { 0 }
+}
+
+fun Context.setMusicVolume(v: Int) {
+    try {
+        val am = getSystemService(Context.AUDIO_SERVICE) as android.media.AudioManager
+        val max = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+        am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, v.coerceIn(0, max), 0)
+    } catch (_: Exception) {}
+}
